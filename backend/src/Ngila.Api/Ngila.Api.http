@@ -1,6 +1,0 @@
-@Ngila.Api_HostAddress = http://localhost:5095
-
-GET {{Ngila.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
