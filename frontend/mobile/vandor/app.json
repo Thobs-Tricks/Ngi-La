@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "NGiLA Vendor",
+    "slug": "vandor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon-mark-opaque.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#FDF9F0",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F8EFDF",
+        "foregroundImage": "./assets/icon-mark.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/icon-mark-opaque.png"
+    }
+  }
+}
