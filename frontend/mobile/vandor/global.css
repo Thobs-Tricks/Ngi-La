@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 0.875rem;
+
+  --background: 253 249 240;
+  --foreground: 19 34 24;
+  --card: 255 255 252;
+  --card-foreground: 19 34 24;
+  --popover: 255 255 252;
+  --popover-foreground: 19 34 24;
+  --primary: 198 78 38;
+  --primary-foreground: 254 250 241;
+  --secondary: 245 236 218;
+  --secondary-foreground: 34 50 39;
+  --muted: 244 238 226;
+  --muted-foreground: 98 103 85;
+  --accent: 239 173 46;
+  --accent-foreground: 48 29 13;
+  --destructive: 218 44 43;
+  --destructive-foreground: 254 250 241;
+  --border: 230 223 208;
+  --input: 230 223 208;
+  --ring: 198 78 38;
+  --ink: 16 37 25;
+  --ink-foreground: 251 245 232;
+  --sand: 248 239 223;
+  --verified: 29 143 105;
+  --chart-1: 198 78 38;
+  --chart-2: 29 143 105;
+  --chart-3: 239 173 46;
+  --chart-4: 16 37 25;
+  --chart-5: 214 111 113;
+  --sidebar: 251 245 232;
+  --sidebar-foreground: 19 34 24;
+  --sidebar-primary: 198 78 38;
+  --sidebar-primary-foreground: 254 250 241;
+  --sidebar-accent: 245 236 218;
+  --sidebar-accent-foreground: 34 50 39;
+  --sidebar-border: 230 223 208;
+  --sidebar-ring: 198 78 38;
+}
+
+.dark {
+  --background: 10 23 16;
+  --foreground: 248 243 233;
+  --card: 18 34 25;
+  --card-foreground: 248 243 233;
+  --popover: 18 34 25;
+  --popover-foreground: 248 243 233;
+  --primary: 231 114 59;
+  --primary-foreground: 8 18 12;
+  --secondary: 29 45 36;
+  --secondary-foreground: 248 243 233;
+  --muted: 29 45 36;
+  --muted-foreground: 167 165 151;
+  --accent: 239 173 46;
+  --accent-foreground: 32 19 8;
+  --destructive: 243 98 93;
+  --destructive-foreground: 251 248 241;
+  --border: 255 255 255;
+  --input: 255 255 255;
+  --ring: 231 114 59;
+  --ink: 5 16 11;
+  --ink-foreground: 248 243 233;
+  --sand: 34 38 24;
+  --verified: 70 182 140;
+  --sidebar: 18 34 25;
+  --sidebar-foreground: 248 243 233;
+  --sidebar-primary: 231 114 59;
+  --sidebar-primary-foreground: 8 18 12;
+  --sidebar-accent: 29 45 36;
+  --sidebar-accent-foreground: 248 243 233;
+  --sidebar-ring: 231 114 59;
+}

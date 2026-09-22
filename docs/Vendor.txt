@@ -1,0 +1,17 @@
+Vendor:
+
+- Register
+  input: Fullnames, Gender, Phone Number, Email, Password, Ts & Cs Checkbox,
+- Login 
+  input: Phone or Email, Password (Maybe keep the session for 12 hrs, then re-login)
+
+
+- Tab
+  Dashboard (Home), My Spaza (For vendor profile), Profile (Users Info, settings etc.)
+
+
+
+
+
+
+
