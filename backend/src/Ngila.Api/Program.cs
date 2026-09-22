@@ -170,12 +170,12 @@ app.UseForwardedHeaders();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-else
+// Swagger stays available in every environment (including Production) so the team has a live,
+// interactive reference for the deployed API - it only exposes the API's shape, not data.
+app.UseSwagger();
+app.UseSwaggerUI();
+
+if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
 }

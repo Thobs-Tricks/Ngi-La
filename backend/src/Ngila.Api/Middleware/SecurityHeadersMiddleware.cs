@@ -16,7 +16,13 @@ public class SecurityHeadersMiddleware
         headers["X-Frame-Options"] = "DENY";
         headers["Referrer-Policy"] = "no-referrer";
         headers["X-Permitted-Cross-Domain-Policies"] = "none";
-        headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+
+        // The JSON API itself needs no CSP allowance at all ('none' is correct there), but the
+        // Swagger UI page is a real browser document that loads its own inline scripts/styles -
+        // give only that path prefix the permissive policy it needs to render.
+        headers["Content-Security-Policy"] = context.Request.Path.StartsWithSegments("/swagger")
+            ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"
+            : "default-src 'none'; frame-ancestors 'none'";
 
         await _next(context);
     }
