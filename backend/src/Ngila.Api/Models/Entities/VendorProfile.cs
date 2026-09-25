@@ -6,15 +6,20 @@ public class VendorProfile
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public Guid UserId { get; set; }
-    public ApplicationUser User { get; set; } = default!;
+    // Null = "community-added" and not yet claimed by the actual business owner - the core
+    // Ngila mechanic where a customer can add a vendor before it has any account at all.
+    public Guid? UserId { get; set; }
+    public ApplicationUser? User { get; set; }
+
+    // The customer (or vendor) who community-added this listing, for attribution and so we can
+    // notify them once it gets claimed. Null for vendors created via ordinary self-registration.
+    public Guid? AddedByUserId { get; set; }
+    public ApplicationUser? AddedByUser { get; set; }
 
     public string BusinessName { get; set; } = default!;
     public string? Description { get; set; }
     public VendorStatus Status { get; set; } = VendorStatus.PendingVerification;
 
-    // Nullable at the storage level so community-added vendors (a future feature) can exist
-    // without a category picked yet, even though self-registration always requires one today.
     public Guid? CategoryId { get; set; }
     public Category? Category { get; set; }
 
@@ -29,8 +34,13 @@ public class VendorProfile
 
     public string? ImageUrl { get; set; }
 
-    // Only ever changed by a future review/rating feature or seed data - never accepted from a
-    // vendor-facing request, since a vendor should not be able to set their own reputation.
+    // Fallback contact number for a listing nobody has claimed yet (no owning User to read a
+    // phone number from). Once claimed, the owner's own ApplicationUser.PhoneNumber takes over.
+    public string? ContactPhone { get; set; }
+
+    // Denormalized aggregates, updated incrementally by ReviewService alongside each review
+    // write - never accepted directly from a vendor-facing request, since a vendor should not be
+    // able to set their own reputation.
     public decimal Rating { get; set; }
     public int ReviewsCount { get; set; }
 

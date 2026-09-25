@@ -91,16 +91,35 @@ Public, read-only, no auth required. Rate-limited more generously than auth (60 
 |---|---|
 | `GET /api/categories` | List of vendor categories |
 | `GET /api/vendors` | Query params: `lat`, `lng`, `categoryId`, `search` (all optional). Sorted by distance from the given coordinates; defaults to Johannesburg CBD if omitted |
-| `GET /api/vendors/{id}` | Vendor detail. Optional `lat`/`lng` for distance |
+| `GET /api/vendors/{id}` | Vendor detail, including raw `latitude`/`longitude` (for building a maps deep link) |
+| `GET /api/vendors/{id}/reviews` | Reviews for one vendor, newest first |
 | `GET /api/feed` | Recent community feed posts. Optional `take` (default 20, max 50) |
+| `GET /api/stats` | Platform-wide counts (vendors, reviews, areas) — backs the home screen's stat cards |
 
-Only verified-*email* vendors appear in discovery (registered but never confirmed = hidden) and
-suspended vendors are always excluded. `rating`/`reviewsCount` are system-set only — never
-accepted from a vendor's own registration/profile request.
+A vendor is discoverable if it isn't suspended, and either has no owner yet (community-added, see
+below) or its owner has confirmed their email — an unconfirmed self-registration doesn't appear
+as a public listing. `rating`/`reviewsCount` are system-set only, updated by `POST .../reviews`,
+never accepted from a vendor's own registration/profile request.
 
 `POST /api/auth/register/vendor` now also requires `categoryId` (see `GET /api/categories`) and
 `locationDescription`, and accepts optional `latitude`, `longitude`, `openingTime`, `closingTime`,
 `imageUrl`.
+
+## Community vendors, reviews & notifications
+
+These back the customer app's "+ Add Vendor", "Rate Vendor" and notification-bell actions.
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `POST /api/vendors` | Authenticated | Community-add a vendor Ngila doesn't know about yet. Starts **unclaimed** (`claimed: false`, no owning account) |
+| `POST /api/vendors/{id}/claim` | Public | The real business claims an unclaimed listing — creates their account and attaches it in one step. `409` if already claimed. Notifies whoever added it |
+| `POST /api/vendors/{id}/reviews` | Authenticated | `{ rating: 1-5, comment? }`. Resubmitting updates your existing review (one per user per vendor) rather than creating a duplicate; `rating`/`reviewsCount` on the vendor update via a running weighted average, not a full table scan |
+| `GET /api/notifications` | Authenticated | Current user's notifications, newest first |
+| `POST /api/notifications/{id}/read` | Authenticated | Mark one as read |
+| `POST /api/notifications/read-all` | Authenticated | Mark all as read |
+
+A vendor's `phone` in discovery responses is its owner's `PhoneNumber` once claimed, falling back
+to the `contactPhone` supplied when it was community-added.
 
 ## Security notes
 
@@ -124,6 +143,8 @@ safe to redeploy repeatedly, it only creates what's missing. It seeds:
   businesses used in the customer app's UI mocks (`frontend/mobile/customer/constants/vendor.ts`
   and `feed.ts`) so real API data lines up with what the screens were designed around
 - 3 demo feed posts referencing those seeded vendors
+- 1 unclaimed community-added vendor ("Ntombi's Braai Stand") demonstrating the add/claim flow
+- 2 demo notifications for one of the seeded customers
 
 All seeded accounts are pre-confirmed (`EmailConfirmed = true`) and skip the email-confirmation
 step, since they're created directly rather than through `/api/auth/register/*`.

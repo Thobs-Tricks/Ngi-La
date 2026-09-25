@@ -1,23 +1,32 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Ngila.Api.Common;
+using Ngila.Api.DTOs.Vendors;
 using Ngila.Api.Services.Interfaces;
 
 namespace Ngila.Api.Controllers;
 
+// No class-level [AllowAnonymous] here deliberately - actions are public by default in this API
+// (no global fallback auth policy is configured), but AllowAnonymous at the class level would
+// silently override the [Authorize] on the mutating actions below, since ASP.NET Core treats
+// AllowAnonymous anywhere in the chain as "skip auth for this action" regardless of Authorize.
 [ApiController]
 [Route("api/vendors")]
-[AllowAnonymous]
 [EnableRateLimiting("public-read")]
 public class VendorsController : ControllerBase
 {
     private const int MaxSearchLength = 100;
 
     private readonly IVendorService _vendorService;
+    private readonly IReviewService _reviewService;
+    private readonly IAuthService _authService;
 
-    public VendorsController(IVendorService vendorService)
+    public VendorsController(IVendorService vendorService, IReviewService reviewService, IAuthService authService)
     {
         _vendorService = vendorService;
+        _reviewService = reviewService;
+        _authService = authService;
     }
 
     /// <summary>
@@ -25,6 +34,7 @@ public class VendorsController : ControllerBase
     /// the given coordinates. Coordinates default to Johannesburg CBD if omitted.
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetVendors(
         [FromQuery] decimal? lat,
         [FromQuery] decimal? lng,
@@ -43,6 +53,7 @@ public class VendorsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetVendor(Guid id, [FromQuery] decimal? lat, [FromQuery] decimal? lng, CancellationToken ct)
     {
         if (!IsValidCoordinate(lat, lng, out var coordinateError))
@@ -50,6 +61,60 @@ public class VendorsController : ControllerBase
 
         var vendor = await _vendorService.GetVendorByIdAsync(id, lat, lng, ct);
         return vendor is null ? NotFound() : Ok(vendor);
+    }
+
+    /// <summary>
+    /// Community-add a vendor that isn't on Ngila yet. Starts unclaimed until the real
+    /// business claims it via POST /api/vendors/{id}/claim.
+    /// </summary>
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> AddVendor(AddVendorRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var vendor = await _vendorService.AddVendorAsync(User.GetUserId(), request, ct);
+            return CreatedAtAction(nameof(GetVendor), new { id = vendor.Id }, vendor);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(title: ex.Message, statusCode: 400);
+        }
+    }
+
+    /// <summary>
+    /// Claims an unclaimed (community-added) vendor listing by creating the owner's account
+    /// and attaching it in one step.
+    /// </summary>
+    [HttpPost("{id:guid}/claim")]
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ClaimVendor(Guid id, ClaimVendorRequest request, CancellationToken ct)
+    {
+        var result = await _authService.ClaimVendorAsync(id, request, ct);
+        return result.Succeeded
+            ? StatusCode(result.StatusCode, result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    [HttpGet("{id:guid}/reviews")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetReviews(Guid id, CancellationToken ct)
+    {
+        var result = await _reviewService.GetReviewsAsync(id, ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    [HttpPost("{id:guid}/reviews")]
+    [Authorize]
+    public async Task<IActionResult> SubmitReview(Guid id, ReviewRequest request, CancellationToken ct)
+    {
+        var result = await _reviewService.SubmitReviewAsync(id, User.GetUserId(), request, ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
     }
 
     private static bool IsValidCoordinate(decimal? lat, decimal? lng, out string? error)

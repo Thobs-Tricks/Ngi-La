@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Ngila.Api.Common;
 using Ngila.Api.Data;
+using Ngila.Api.DTOs.Stats;
 using Ngila.Api.DTOs.Vendors;
 using Ngila.Api.Models.Entities;
 using Ngila.Api.Models.Enums;
@@ -27,13 +28,7 @@ public class VendorService : IVendorService
 
     public async Task<IReadOnlyList<VendorResponse>> GetVendorsAsync(NearbyQuery query, CancellationToken ct = default)
     {
-        var vendorQuery = _context.VendorProfiles
-            .Include(v => v.User)
-            .Include(v => v.Category)
-            // Excludes suspended vendors and anyone who never confirmed their email - an
-            // unconfirmed registration shouldn't be able to appear as a public listing.
-            .Where(v => v.Status != VendorStatus.Suspended && v.User.EmailConfirmed)
-            .AsQueryable();
+        var vendorQuery = DiscoverableVendors();
 
         if (query.CategoryId is not null)
             vendorQuery = vendorQuery.Where(v => v.CategoryId == query.CategoryId);
@@ -59,17 +54,65 @@ public class VendorService : IVendorService
 
     public async Task<VendorResponse?> GetVendorByIdAsync(Guid id, decimal? latitude, decimal? longitude, CancellationToken ct = default)
     {
-        var vendor = await _context.VendorProfiles
-            .Include(v => v.User)
-            .Include(v => v.Category)
-            .Where(v => v.Status != VendorStatus.Suspended && v.User.EmailConfirmed)
-            .FirstOrDefaultAsync(v => v.Id == id, ct);
+        var vendor = await DiscoverableVendors().FirstOrDefaultAsync(v => v.Id == id, ct);
 
         if (vendor is null)
             return null;
 
         return MapToResponse(vendor, latitude ?? GeoUtils.DefaultLatitude, longitude ?? GeoUtils.DefaultLongitude);
     }
+
+    public async Task<VendorResponse> AddVendorAsync(Guid addedByUserId, AddVendorRequest request, CancellationToken ct = default)
+    {
+        var categoryExists = await _context.Categories.AnyAsync(c => c.Id == request.CategoryId, ct);
+        if (!categoryExists)
+            throw new InvalidOperationException("Selected category does not exist.");
+
+        var vendor = new VendorProfile
+        {
+            UserId = null, // unclaimed - see product doc's "community vendor discovery"
+            AddedByUserId = addedByUserId,
+            BusinessName = request.BusinessName,
+            Description = request.Description,
+            CategoryId = request.CategoryId,
+            LocationDescription = request.LocationDescription,
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+            ContactPhone = request.ContactPhone,
+            ImageUrl = request.ImageUrl,
+            Status = VendorStatus.PendingVerification,
+        };
+
+        _context.VendorProfiles.Add(vendor);
+        await _context.SaveChangesAsync(ct);
+
+        var category = await _context.Categories.FirstAsync(c => c.Id == request.CategoryId, ct);
+        vendor.Category = category;
+
+        return MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude);
+    }
+
+    public async Task<PlatformStatsResponse> GetStatsAsync(CancellationToken ct = default)
+    {
+        var vendorCount = await DiscoverableVendors().CountAsync(ct);
+        var reviewCount = await _context.Reviews.CountAsync(ct);
+        var areaCount = await DiscoverableVendors()
+            .Where(v => v.LocationDescription != null)
+            .Select(v => v.LocationDescription)
+            .Distinct()
+            .CountAsync(ct);
+
+        return new PlatformStatsResponse(vendorCount, reviewCount, areaCount);
+    }
+
+    // A vendor is publicly discoverable if it's not suspended, and either unclaimed (community
+    // added, no account to confirm an email on) or its owner has confirmed their email - closes
+    // a spam-listing gap where an unconfirmed self-registration would otherwise be visible.
+    private IQueryable<VendorProfile> DiscoverableVendors() =>
+        _context.VendorProfiles
+            .Include(v => v.User)
+            .Include(v => v.Category)
+            .Where(v => v.Status != VendorStatus.Suspended && (v.UserId == null || v.User!.EmailConfirmed));
 
     private static VendorResponse MapToResponse(VendorProfile vendor, decimal latitude, decimal longitude)
     {
@@ -84,16 +127,15 @@ public class VendorService : IVendorService
             Description: vendor.Description,
             Location: vendor.LocationDescription ?? "Location not set",
             Distance: Math.Round(distance, 0),
+            Latitude: vendor.Latitude,
+            Longitude: vendor.Longitude,
             Rating: vendor.Rating,
             ReviewsCount: vendor.ReviewsCount,
             IsOpen: DisplayFormatting.IsOpenNow(vendor.OpeningTime, vendor.ClosingTime),
             IsVerified: vendor.Status == VendorStatus.Verified,
-            // Every vendor today is created via self-registration, so it always has an owning,
-            // authenticated account - "claimed" only becomes meaningful once community-added
-            // (unclaimed) listings exist as a feature.
-            Claimed: true,
+            Claimed: vendor.UserId is not null,
             Image: vendor.ImageUrl,
-            Phone: vendor.User.PhoneNumber,
+            Phone: vendor.User?.PhoneNumber ?? vendor.ContactPhone,
             Hours: DisplayFormatting.FormatHours(vendor.OpeningTime, vendor.ClosingTime));
     }
 }

@@ -140,6 +140,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
 builder.Services.AddScoped<IVendorService, VendorService>();
 builder.Services.AddScoped<IFeedService, FeedService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // ---------- Validation ----------
 builder.Services.AddFluentValidationAutoValidation();

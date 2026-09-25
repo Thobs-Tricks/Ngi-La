@@ -7,6 +7,8 @@ public record VendorResponse(
     string? Description,
     string Location,
     double Distance,
+    decimal? Latitude,
+    decimal? Longitude,
     decimal Rating,
     int ReviewsCount,
     bool IsOpen,

@@ -29,6 +29,8 @@ public static class DbSeeder
         var categories = await SeedCategoriesAsync(context, logger);
         await SeedDemoVendorsAndCustomersAsync(context, userManager, categories, logger);
         await SeedFeedPostsAsync(context, logger);
+        await SeedCommunityAddedVendorAsync(context, categories, logger);
+        await SeedNotificationsAsync(context, logger);
     }
 
     private static async Task SeedRolesAsync(RoleManager<IdentityRole<Guid>> roleManager)
@@ -289,6 +291,76 @@ public static class DbSeeder
 
         await context.SaveChangesAsync();
         logger.LogInformation("Seeded 3 demo feed posts.");
+    }
+
+    // Demonstrates the flagship "community adds a vendor Ngila doesn't know about yet" flow -
+    // an unclaimed listing (UserId null) sitting alongside the claimed demo vendors above.
+    private static async Task SeedCommunityAddedVendorAsync(
+        ApplicationDbContext context, Dictionary<string, Category> categories, ILogger logger)
+    {
+        const string businessName = "Ntombi's Braai Stand";
+        if (await context.VendorProfiles.AnyAsync(v => v.BusinessName == businessName))
+            return;
+
+        var addedBy = await context.Users.FirstOrDefaultAsync(u => u.Email == "naledi.dube@ngila.demo");
+        if (addedBy is null)
+        {
+            logger.LogWarning("Skipped community-added vendor seeding - seed customer not found.");
+            return;
+        }
+
+        context.VendorProfiles.Add(new VendorProfile
+        {
+            UserId = null,
+            AddedByUserId = addedBy.Id,
+            BusinessName = businessName,
+            Description = "Weekend braai spot near the taxi rank - amazing chops, cash only.",
+            CategoryId = categories["Food"].Id,
+            LocationDescription = "Next to the Bree Street taxi rank, Braamfontein",
+            Latitude = -26.1955m,
+            Longitude = 28.0330m,
+            ContactPhone = null,
+            Status = VendorStatus.PendingVerification,
+        });
+
+        await context.SaveChangesAsync();
+        logger.LogInformation("Seeded 1 unclaimed community-added vendor.");
+    }
+
+    private static async Task SeedNotificationsAsync(ApplicationDbContext context, ILogger logger)
+    {
+        if (await context.Notifications.AnyAsync())
+            return;
+
+        var thabo = await context.Users.FirstOrDefaultAsync(u => u.Email == "thabo.molefe@ngila.demo");
+        if (thabo is null)
+        {
+            logger.LogWarning("Skipped notification seeding - seed customer not found.");
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+
+        context.Notifications.AddRange(
+            new Notification
+            {
+                UserId = thabo.Id,
+                Title = "Welcome to Ngila!",
+                Body = "Discover street vendors near you and help grow your local economy.",
+                IsRead = true,
+                CreatedAt = now.AddDays(-2),
+            },
+            new Notification
+            {
+                UserId = thabo.Id,
+                Title = "New vendor added near you",
+                Body = "Sparkle Mobile Car Wash just joined Ngila in Braamfontein.",
+                IsRead = false,
+                CreatedAt = now.AddHours(-6),
+            });
+
+        await context.SaveChangesAsync();
+        logger.LogInformation("Seeded 2 demo notifications.");
     }
 
     private sealed record DemoVendorSeed(
