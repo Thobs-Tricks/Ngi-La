@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { fetchStats } from "@/lib/endpoints";
 
-type NavItem = { to: "/" | "/verification" | "/vendors" | "/categories" | "/reports" | "/users"; label: string; badgeKey?: "verification" | "reports" };
+type NavItem = { to: "/" | "/verification" | "/vendors" | "/categories" | "/reports" | "/users" | "/settings"; label: string; badgeKey?: "verification" | "reports" };
 
 const inspect: NavItem[] = [
   { to: "/", label: "Overview" },
@@ -15,7 +15,10 @@ const inspect: NavItem[] = [
   { to: "/reports", label: "Reports", badgeKey: "reports" },
 ];
 
-const insight: NavItem[] = [{ to: "/users", label: "Users & Contributors" }];
+const insight: NavItem[] = [
+  { to: "/users", label: "Users & Contributors" },
+  { to: "/settings", label: "Settings" },
+];
 
 function NavLink({ item, active, badge }: { item: NavItem; active: boolean; badge: number | undefined }) {
   return (

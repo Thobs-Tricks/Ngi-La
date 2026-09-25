@@ -101,3 +101,9 @@ export type Report = {
   isResolved: boolean;
   time: string;
 };
+
+export type EmailSettings = {
+  senderEmail: string | null;
+  isConfigured: boolean;
+  updatedAt: string | null;
+};
