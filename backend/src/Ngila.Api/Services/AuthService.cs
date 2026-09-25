@@ -17,7 +17,6 @@ public class AuthService : IAuthService
     private const string GenericResetError = "Invalid or expired token.";
 
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
@@ -28,7 +27,6 @@ public class AuthService : IAuthService
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
-        SignInManager<ApplicationUser> signInManager,
         RoleManager<IdentityRole<Guid>> roleManager,
         ApplicationDbContext context,
         ITokenService tokenService,
@@ -38,7 +36,6 @@ public class AuthService : IAuthService
         ILogger<AuthService> logger)
     {
         _userManager = userManager;
-        _signInManager = signInManager;
         _roleManager = roleManager;
         _context = context;
         _tokenService = tokenService;
@@ -162,18 +159,27 @@ public class AuthService : IAuthService
             return ServiceResult<AuthResponse>.Failure(GenericLoginError, 401);
         }
 
-        var signInResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
-
-        if (signInResult.IsLockedOut)
+        if (await _userManager.IsLockedOutAsync(user))
         {
             return ServiceResult<AuthResponse>.Failure(
                 "Account temporarily locked due to multiple failed login attempts. Please try again later.", 423);
         }
 
-        if (!signInResult.Succeeded)
+        // Checking the password directly via UserManager rather than
+        // SignInManager.CheckPasswordSignInAsync deliberately: that method's PreSignInCheck runs
+        // the RequireConfirmedEmail gate *before* verifying the password, so an unconfirmed
+        // account with the *correct* password would fail with SignInResult.NotAllowed and get
+        // reported here as the generic "Invalid email or password" - hiding the real, fixable
+        // reason. Checking the password first preserves that generic message for genuinely wrong
+        // passwords (no account-enumeration change - a wrong password looks identical either way)
+        // while giving a confirmed-wrong-password holder the accurate "confirm your email" reason.
+        if (!await _userManager.CheckPasswordAsync(user, request.Password))
         {
+            await _userManager.AccessFailedAsync(user);
             return ServiceResult<AuthResponse>.Failure(GenericLoginError, 401);
         }
+
+        await _userManager.ResetAccessFailedCountAsync(user);
 
         if (!user.EmailConfirmed)
         {
