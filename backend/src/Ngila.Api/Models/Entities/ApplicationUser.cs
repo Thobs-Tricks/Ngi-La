@@ -9,10 +9,6 @@ public class ApplicationUser : IdentityUser<Guid>
     public string LastName { get; set; } = default!;
     public Gender? Gender { get; set; }
 
-    // Only meaningful for Admin-role accounts - which admin-only actions this account can take.
-    // See Common/AdminPolicies.cs for the permission matrix.
-    public AdminTitle? AdminTitle { get; set; }
-
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }

@@ -4,7 +4,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Ngila.Api.Common;
 using Ngila.Api.Configuration;
 using Ngila.Api.Models.Entities;
 using Ngila.Api.Services.Interfaces;
@@ -32,9 +31,6 @@ public class TokenService : ITokenService
         };
 
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
-
-        if (user.AdminTitle is not null)
-            claims.Add(new Claim(AdminPolicies.AdminTitleClaimType, user.AdminTitle.Value.ToString()));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

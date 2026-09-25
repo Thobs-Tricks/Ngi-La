@@ -1,6 +1,5 @@
 using FluentValidation;
 using Ngila.Api.DTOs.Auth;
-using Ngila.Api.Models.Enums;
 
 namespace Ngila.Api.Validators;
 
@@ -18,9 +17,5 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
             .WithMessage("Phone number is not in a valid format.");
         RuleFor(x => x.Password).MustBeAStrongPassword();
         RuleFor(x => x.Gender).IsInEnum().When(x => x.Gender.HasValue);
-        RuleFor(x => x.AdminTitle)
-            .NotNull().WithMessage("AdminTitle is required when userType is Admin.")
-            .When(x => x.UserType == UserType.Admin);
-        RuleFor(x => x.AdminTitle).IsInEnum().When(x => x.AdminTitle.HasValue);
     }
 }

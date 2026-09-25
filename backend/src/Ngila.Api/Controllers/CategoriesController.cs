@@ -30,7 +30,7 @@ public class CategoriesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = AdminPolicies.CanManageCategories)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> CreateCategory(CategoryCreateRequest request, CancellationToken ct)
     {
         var result = await _vendorService.CreateCategoryAsync(request, ct);

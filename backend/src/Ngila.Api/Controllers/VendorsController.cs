@@ -148,7 +148,7 @@ public class VendorsController : ControllerBase
     /// Admin verification queue: vendors with a claimant awaiting a decision.
     /// </summary>
     [HttpGet("verification-queue")]
-    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> GetVerificationQueue(CancellationToken ct)
     {
         var queue = await _vendorService.GetVerificationQueueAsync(ct);
@@ -156,7 +156,7 @@ public class VendorsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/verify")]
-    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> VerifyVendor(Guid id, CancellationToken ct)
     {
         var result = await _vendorService.VerifyVendorAsync(id, User.GetUserId(), ct);
@@ -170,7 +170,7 @@ public class VendorsController : ControllerBase
     /// the listing itself.
     /// </summary>
     [HttpPost("{id:guid}/reject-claim")]
-    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> RejectClaim(Guid id, CancellationToken ct)
     {
         var result = await _vendorService.RejectClaimAsync(id, User.GetUserId(), ct);
@@ -180,7 +180,7 @@ public class VendorsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/request-info")]
-    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> RequestInfo(Guid id, RequestInfoRequest request, CancellationToken ct)
     {
         var result = await _vendorService.RequestInfoAsync(id, request, ct);
@@ -194,7 +194,7 @@ public class VendorsController : ControllerBase
     /// unconfirmed listings that the public GET /api/vendors deliberately hides.
     /// </summary>
     [HttpGet("admin-list")]
-    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> GetAdminVendors(CancellationToken ct)
     {
         var vendors = await _vendorService.GetAllForAdminAsync(ct);
@@ -202,7 +202,7 @@ public class VendorsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/suspend")]
-    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> SuspendVendor(Guid id, CancellationToken ct)
     {
         var result = await _vendorService.SetSuspendedAsync(id, true, User.GetUserId(), ct);
@@ -212,7 +212,7 @@ public class VendorsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/unsuspend")]
-    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> UnsuspendVendor(Guid id, CancellationToken ct)
     {
         var result = await _vendorService.SetSuspendedAsync(id, false, User.GetUserId(), ct);

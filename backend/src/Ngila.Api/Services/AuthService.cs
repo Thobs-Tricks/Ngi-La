@@ -48,14 +48,14 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
-    public async Task<ServiceResult<MessageResponse>> RegisterAsync(RegisterRequest request, bool callerCanCreateAdmins, CancellationToken ct = default)
+    public async Task<ServiceResult<MessageResponse>> RegisterAsync(RegisterRequest request, bool callerIsAdmin, CancellationToken ct = default)
     {
         // The route this hits is reachable anonymously (Customer/Vendor must be publicly
         // self-serve), so this is the only thing standing between "anyone" and a fresh Admin
-        // account. callerCanCreateAdmins is true only for an authenticated Admin whose own
-        // AdminTitle is OperationsAdmin - do not remove without an equivalent guard.
-        if (request.UserType == UserType.Admin && !callerCanCreateAdmins)
-            return ServiceResult<MessageResponse>.Failure("Only an Operations Admin can create another admin account.", 403);
+        // account. callerIsAdmin is true only for an authenticated Admin - do not remove without
+        // an equivalent guard.
+        if (request.UserType == UserType.Admin && !callerIsAdmin)
+            return ServiceResult<MessageResponse>.Failure("Only an existing admin can create another admin account.", 403);
 
         var role = request.UserType switch
         {
@@ -69,7 +69,7 @@ public class AuthService : IAuthService
 
         var createResult = await CreateUserAsync(
             request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password,
-            request.Gender, role, request.UserType == UserType.Admin ? request.AdminTitle : null);
+            request.Gender, role);
 
         if (!createResult.Succeeded || createResult.Data is null)
             return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
@@ -320,12 +320,12 @@ public class AuthService : IAuthService
 
         return ServiceResult<CurrentUserResponse>.Success(new CurrentUserResponse(
             user.Id, user.Email!, user.FirstName, user.LastName, user.PhoneNumber, user.Gender,
-            roles.FirstOrDefault() ?? string.Empty, user.AdminTitle, user.EmailConfirmed, user.CreatedAt));
+            roles.FirstOrDefault() ?? string.Empty, user.EmailConfirmed, user.CreatedAt));
     }
 
     private async Task<ServiceResult<ApplicationUser>> CreateUserAsync(
         string email, string firstName, string lastName, string? phoneNumber, string password,
-        Gender? gender, string role, AdminTitle? adminTitle = null)
+        Gender? gender, string role)
     {
         var existing = await _userManager.FindByEmailAsync(email);
         if (existing is not null)
@@ -342,7 +342,6 @@ public class AuthService : IAuthService
             LastName = lastName,
             PhoneNumber = phoneNumber,
             Gender = gender,
-            AdminTitle = adminTitle,
         };
 
         var createResult = await _userManager.CreateAsync(user, password);

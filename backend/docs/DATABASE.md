@@ -48,7 +48,6 @@ erDiagram
         string FirstName
         string LastName
         int Gender
-        int AdminTitle
         bool IsActive
         datetime CreatedAt
         datetime LastLoginAt
@@ -217,7 +216,6 @@ not as separate user tables).
 | `FirstName` | `nvarchar(100)` NOT NULL | Ngila-specific |
 | `LastName` | `nvarchar(100)` NOT NULL | Ngila-specific |
 | `Gender` | `int` NULL | Ngila-specific, optional. Serialized as a string (`"Male"`) over the API — see the `Gender` enum below |
-| `AdminTitle` | `int` NULL | Ngila-specific. Only meaningful for `Admin`-role rows — the permission tier within Admin (see the `AdminTitle` enum below). Also carried as an `admin_title` JWT claim so authorization policies don't need a DB round-trip |
 | `IsActive` | `bit` NOT NULL | Ngila-specific — soft disable without deleting the account |
 | `CreatedAt` | `datetime2` NOT NULL | Ngila-specific |
 | `LastLoginAt` | `datetime2` NULL | Ngila-specific |
@@ -304,7 +302,7 @@ future customer-specific fields (favourites, saved addresses, etc.) off without 
 
 Simple lookup table backing `GET /api/categories` and `VendorProfiles.CategoryId`. Seeded once
 by `DbSeeder` (Food, Fresh Produce, Clothing, Barber, Repairs, Car Wash, Accessories);
-`POST /api/categories` (OperationsAdmin only) adds more. No delete/rename endpoint yet.
+`POST /api/categories` (Admin only) adds more. No delete/rename endpoint yet.
 
 ### FeedPosts
 
@@ -440,19 +438,6 @@ Picks which of the three account types `POST /api/auth/register` creates — it'
 a column anywhere; the choice is realized as an `AspNetRoles`/`AspNetUserRoles` assignment (and,
 for `Customer`, a `CustomerProfiles` row) once the account is created. See `AuthService.RegisterAsync`.
 
-### `AdminTitle` (`AspNetUsers.AdminTitle`)
-
-| Value | Meaning | Can do (see `Common/AdminPolicies.cs`) |
-|---|---|---|
-| `0` — `OperationsAdmin` | | Everything: verify/reject vendors, manage categories, resolve reports, view users, create new Admins |
-| `1` — `VerificationReviewer` | | Verify/reject/request-info on vendor claims only |
-| `2` — `CommunityManager` | | Resolve reports, view the admin user list |
-
-Required (`NOT NULL` at the DTO level, though the column itself is nullable) whenever
-`UserType: "Admin"` is registered; meaningless for Customer/Vendor rows. The bootstrap admin
-(`AdminBootstrap:*` config) is always seeded as `OperationsAdmin`, since only that title can
-create the other two.
-
 ### `ReportKind` (`Reports.Kind`)
 
 | Value | Meaning |
@@ -526,13 +511,6 @@ create the other two.
   `VendorProfiles.UserId` itself (alongside `AddedByUserId`'s `SET NULL`). Practically: deleting a
   user who still owns a claimed `VendorProfile` is blocked at the database level rather than
   silently cascading — there's no user-deletion feature yet, so this hasn't needed a workaround.
-- **Why is the Admin permission tier (`AdminTitle`) a JWT claim, not just a DB lookup per
-  request?** It's stored on `AspNetUsers` either way, but `TokenService` also copies it into the
-  access token as an `admin_title` claim at login/refresh time, and `Program.cs` defines named
-  authorization policies (`CanManageVendorVerification`, etc.) that check the claim directly.
-  This avoids a DB round-trip on every admin request just to answer "is this caller allowed to
-  do this" — the tradeoff is that changing someone's `AdminTitle` doesn't take effect until they
-  next log in or refresh (there's no "revoke this token's claims immediately" endpoint).
 
 ## Working with migrations
 

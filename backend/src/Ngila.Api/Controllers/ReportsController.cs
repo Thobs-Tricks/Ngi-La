@@ -33,7 +33,7 @@ public class ReportsController : ControllerBase
     }
 
     [HttpGet("api/admin/reports")]
-    [Authorize(Policy = AdminPolicies.CanManageReports)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> GetReports(CancellationToken ct)
     {
         var reports = await _reportService.GetReportsAsync(ct);
@@ -41,7 +41,7 @@ public class ReportsController : ControllerBase
     }
 
     [HttpPost("api/admin/reports/{id:guid}/resolve")]
-    [Authorize(Policy = AdminPolicies.CanManageReports)]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> ResolveReport(Guid id, CancellationToken ct)
     {
         var result = await _reportService.ResolveReportAsync(id, User.GetUserId(), ct);

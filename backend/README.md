@@ -96,18 +96,17 @@ One shape for all three account types:
   "email": "...",
   "phoneNumber": "...",   // optional
   "password": "...",
-  "gender": "Female" | "Male" | "Other",   // optional
-  "adminTitle": "OperationsAdmin" | "VerificationReviewer" | "CommunityManager"   // required iff userType is Admin
+  "gender": "Female" | "Male" | "Other"   // optional
 }
 ```
 
 \* The route itself is anonymous-reachable (Customer/Vendor must be publicly self-serve), but
 `userType: "Admin"` is rejected with `403` unless the caller is already authenticated **as an
-OperationsAdmin specifically** — checked inside the handler (`AuthService.RegisterAsync`), since
-the route can't declare `[Authorize]` for only some request bodies. **Don't remove that check
-without replacing it** — it's the only thing stopping anonymous self-service Admin creation now
-that Customer, Vendor and Admin share one endpoint. See "Admin console" below for what
-`adminTitle` controls.
+Admin** — checked inside the handler (`AuthService.RegisterAsync`), since the route can't declare
+`[Authorize]` for only some request bodies. **Don't remove that check without replacing it** —
+it's the only thing stopping anonymous self-service Admin creation now that Customer, Vendor and
+Admin share one endpoint. There is only one Admin type — every admin account has identical
+permissions, no sub-roles.
 
 Side effects differ by type, same as before the endpoints were merged:
 - **Customer** — creates a `CustomerProfile` row, sends confirmation email
@@ -172,45 +171,32 @@ Built directly against `Admin/` (the TanStack Start admin web app in this repo) 
 interactive element there (verification decisions, category creation, report resolution) is
 backed by a real endpoint, not just the read-only views.
 
-### Admin sub-roles (`AdminTitle`)
-
-Every Admin account (`userType: "Admin"`) also carries an `adminTitle`, a finer-grained
-permission tier on top of the shared `Admin` Identity role. It rides in the JWT as an
-`admin_title` claim (see `TokenService`) so authorization checks don't need a DB round-trip, and
-is enforced via named policies (`Common/AdminPolicies.cs`, wired up in `Program.cs`):
-
-| Action | OperationsAdmin | VerificationReviewer | CommunityManager |
-|---|:---:|:---:|:---:|
-| Verify / reject vendor claims | ✓ | ✓ | |
-| Create categories | ✓ | | |
-| Resolve reports | ✓ | | ✓ |
-| View the admin user list | ✓ | | ✓ |
-| Create new Admin accounts | ✓ | | |
-
-`GET /api/admin/stats` and `GET /api/admin/activity` are available to **any** Admin sub-role —
-read-only aggregate data, no fine-grained gate. The bootstrap admin (`AdminBootstrap:*`) is
-always seeded as `OperationsAdmin` so there's a way to create the other two titles at all.
+There is only one Admin type — every admin account can perform every admin action
+(`[Authorize(Roles = Roles.Admin)]` is the only gate; no sub-roles or permission tiers).
 
 ### Vendor verification queue
 
 | Endpoint | Auth | Notes |
 |---|---|---|
-| `GET /api/vendors/verification-queue` | `CanManageVendorVerification` | Vendors with `Status = PendingVerification` and a claimant (`UserId` set) — covers both freshly self-registered vendors and claimed community-added listings |
-| `POST /api/vendors/{id}/verify` | `CanManageVendorVerification` | Sets `Status = Verified`, notifies the owner |
-| `POST /api/vendors/{id}/reject-claim` | `CanManageVendorVerification` | Reverts the listing to **unclaimed** (`UserId = null`) rather than suspending it — the claim is what's rejected, not necessarily the business. Notifies the (former) claimant |
-| `POST /api/vendors/{id}/request-info` | `CanManageVendorVerification` | `{ message }` — sends the claimant a notification with no status change |
+| `GET /api/vendors/verification-queue` | Admin | Vendors with `Status = PendingVerification` and a claimant (`UserId` set) — covers both freshly self-registered vendors and claimed community-added listings |
+| `POST /api/vendors/{id}/verify` | Admin | Sets `Status = Verified`, notifies the owner |
+| `POST /api/vendors/{id}/reject-claim` | Admin | Reverts the listing to **unclaimed** (`UserId = null`) rather than suspending it — the claim is what's rejected, not necessarily the business. Notifies the (former) claimant |
+| `POST /api/vendors/{id}/request-info` | Admin | `{ message }` — sends the claimant a notification with no status change |
+| `GET /api/vendors/admin-list` | Admin | Full vendor list for the "Claims & Vendors" admin table — includes suspended/unclaimed listings the public `GET /api/vendors` hides |
+| `POST /api/vendors/{id}/suspend` | Admin | Only valid from `Verified` — sets `Status = Suspended`, notifies the owner |
+| `POST /api/vendors/{id}/unsuspend` | Admin | Only valid from `Suspended` — reverts to `Verified` |
 
 ### Categories, reports, dashboard
 
 | Endpoint | Auth | Notes |
 |---|---|---|
-| `POST /api/categories` | `CanManageCategories` | `{ name }`. `409` on a duplicate name |
+| `POST /api/categories` | Admin | `{ name }`. `409` on a duplicate name |
 | `POST /api/reports` | Authenticated (any role) | File a report: `{ kind: "Flag" \| "ReviewDispute", title, detail, targetVendorId? or targetReviewId? }` — matches the doc's community-moderation flow |
-| `GET /api/admin/reports` | `CanManageReports` | All reports, open first, then by priority/recency |
-| `POST /api/admin/reports/{id}/resolve` | `CanManageReports` | Idempotent — resolving twice is a no-op |
-| `GET /api/admin/stats` | Any Admin | `{ totalVendors, communityAdded, pendingVerification, activeUsers, reportsOpen }` |
-| `GET /api/admin/activity` | Any Admin | Recent activity feed. Optional `take` (default 20, max 100). Written by a small set of trigger points (vendor added/claimed/verified, claim rejected, report resolved) — not a full audit log of every write |
-| `GET /api/admin/users` | `CanViewUsers` | Every user with role, active status, join date, vendors added, reviews written. No gamification (points/levels/"Inspector" role) — deliberately deferred, matches the product doc's own MVP scoping |
+| `GET /api/admin/reports` | Admin | All reports, open first, then by priority/recency |
+| `POST /api/admin/reports/{id}/resolve` | Admin | Idempotent — resolving twice is a no-op |
+| `GET /api/admin/stats` | Admin | `{ totalVendors, communityAdded, pendingVerification, activeUsers, reportsOpen }` |
+| `GET /api/admin/activity` | Admin | Recent activity feed. Optional `take` (default 20, max 100). Written by a small set of trigger points (vendor added/claimed/verified, claim rejected, report resolved) — not a full audit log of every write |
+| `GET /api/admin/users` | Admin | Every user with role, active status, join date, vendors added, reviews written. No gamification (points/levels/"Inspector" role) — deliberately deferred, matches the product doc's own MVP scoping |
 
 ## Security notes
 

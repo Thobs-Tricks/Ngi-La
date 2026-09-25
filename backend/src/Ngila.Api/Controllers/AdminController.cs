@@ -24,10 +24,6 @@ public class AdminController : ControllerBase
         _activityLogService = activityLogService;
     }
 
-    /// <summary>
-    /// Dashboard overview counts. Available to every Admin sub-role - read-only, no PII beyond
-    /// aggregate numbers.
-    /// </summary>
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats(CancellationToken ct)
     {
@@ -44,7 +40,6 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("users")]
-    [Authorize(Policy = AdminPolicies.CanViewUsers)]
     public async Task<IActionResult> GetUsers(CancellationToken ct)
     {
         var users = await _adminService.GetUsersAsync(ct);
