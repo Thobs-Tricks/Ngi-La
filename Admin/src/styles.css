@@ -1,0 +1,162 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Ngila admin design system — "Frosted Ledger".
+ * Warm paper ground, frosted surfaces, market-inspector palette.
+ * All color values use oklch. Never hardcode colors in components.
+ */
+
+@theme {
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --ease-ledger: cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-rise: rise 0.55s var(--ease-ledger) both;
+  --animate-stamp: stamp 0.5s var(--ease-ledger) both;
+  --animate-pulse-soft: pulsesoft 1.8s var(--ease-ledger) infinite;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Ngila semantic tokens */
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-mute: var(--mute);
+  --color-ember: var(--ember);
+  --color-moss: var(--moss);
+  --color-amber: var(--amber);
+  --color-clay: var(--clay);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  --ink: oklch(0.245 0.015 62);
+  --paper: oklch(0.951 0.022 84);
+  --surface: oklch(0.989 0.009 88);
+  --line: oklch(0.245 0.015 62 / 10%);
+  --mute: oklch(0.585 0.022 72);
+  --ember: oklch(0.573 0.149 48);
+  --moss: oklch(0.503 0.081 152);
+  --amber: oklch(0.615 0.116 80);
+  --clay: oklch(0.463 0.124 27);
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: oklch(0.96 0.014 84);
+  --secondary-foreground: var(--ink);
+  --muted: oklch(0.96 0.014 84);
+  --muted-foreground: var(--mute);
+  --accent: oklch(0.573 0.149 48 / 12%);
+  --accent-foreground: var(--ember);
+  --destructive: var(--clay);
+  --destructive-foreground: var(--paper);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--ember);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.9) rotate(-16deg);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-7deg);
+  }
+}
+
+@keyframes pulsesoft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.28;
+  }
+}
+
+@utility panel {
+  border-radius: var(--radius-2xl);
+  background-color: color-mix(in oklab, var(--surface) 55%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line);
+  backdrop-filter: blur(24px);
+}
+
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--ember) 20%, transparent);
+  }
+}
