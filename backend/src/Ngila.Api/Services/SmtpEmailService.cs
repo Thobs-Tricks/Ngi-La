@@ -95,6 +95,10 @@ public class SmtpEmailService : IEmailService
         }
     }
 
-    private string AdminBaseUrl() => (_configuration["Frontend:AdminBaseUrl"] ?? "http://localhost:8080").TrimEnd('/');
+    private string AdminBaseUrl()
+    {
+        var configured = _configuration["Frontend:AdminBaseUrl"];
+        return string.IsNullOrWhiteSpace(configured) ? "http://localhost:8080" : configured.TrimEnd('/');
+    }
     private string LogoUrl() => $"{AdminBaseUrl()}/ngila-logo.png";
 }
