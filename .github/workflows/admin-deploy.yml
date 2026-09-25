@@ -1,0 +1,44 @@
+name: Deploy Admin Console to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Admin/**'
+      - '.github/workflows/admin-deploy.yml'
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: ngila-admin
+  NODE_VERSION: '22.x'
+  APP_DIR: Admin
+  # Baked into the client/server bundles at build time (Vite inlines import.meta.env.VITE_*) -
+  # an Azure App Setting alone would NOT affect this, since nothing reads it at runtime.
+  VITE_API_URL: https://ngila-api.azurewebsites.net
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm install
+
+      - name: Build
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run build
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_ADMIN_PUBLISH_PROFILE }}
+          package: ${{ env.APP_DIR }}/.output

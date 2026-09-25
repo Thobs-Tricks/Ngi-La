@@ -12,4 +12,7 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Deployed to an Azure App Service (plain Linux Node runtime), not Cloudflare Workers - override
+  // the default cloudflare-module preset with a standalone Node server build.
+  nitro: { preset: "node-server" },
 });
