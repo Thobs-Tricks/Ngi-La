@@ -68,7 +68,7 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 | Endpoint | Auth | Notes |
 |---|---|---|
 | `POST /api/auth/register/customer` | Public | Creates Customer + profile, sends email confirmation |
-| `POST /api/auth/register/vendor` | Public | Creates Vendor + profile, sends email confirmation |
+| `POST /api/auth/register/vendor` | Public | Personal details only (name, phone, email, password, optional `gender`) — no shop info. Sends email confirmation |
 | `POST /api/auth/register/admin` | Admin only | Existing admin vouches for a new one |
 | `POST /api/auth/login` | Public | Returns access token (15 min) + refresh token (7 days) |
 | `POST /api/auth/refresh` | Public | Rotates refresh token; reuse of a revoked token revokes **all** sessions |
@@ -82,6 +82,9 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 All `/api/auth/*` endpoints are rate-limited (10 requests/min/IP). Passwords are sent once —
 there is no `confirmPassword`/`confirmNewPassword` field anywhere in the API; matching the two
 password fields is a client-side concern only.
+
+Enums (`gender`, and any future ones) are sent/received as readable strings (`"Male"`, not `1`) —
+every registration DTO accepts an optional `gender: "Female" | "Male" | "Other"`.
 
 ## Discovery & feed endpoints
 
@@ -101,9 +104,23 @@ below) or its owner has confirmed their email — an unconfirmed self-registrati
 as a public listing. `rating`/`reviewsCount` are system-set only, updated by `POST .../reviews`,
 never accepted from a vendor's own registration/profile request.
 
-`POST /api/auth/register/vendor` now also requires `categoryId` (see `GET /api/categories`) and
-`locationDescription`, and accepts optional `latitude`, `longitude`, `openingTime`, `closingTime`,
-`imageUrl`.
+## Vendor onboarding: two ways to end up with a shop profile
+
+Registering a Vendor account (`POST /api/auth/register/vendor`) creates a bare account with no
+shop profile yet — the vendor app's "MySpaza" screen is where that actually gets set up. There
+are two independent paths to owning a `VendorProfile`:
+
+1. **Self-registration → set up shop later**: register → confirm email → log in → `PUT /api/vendors/me`
+   whenever ready (see below).
+2. **Claim an existing community-added listing**: someone already added this business via
+   `POST /api/vendors` before its real owner ever signed up (see next section) — the owner finds
+   it and calls `POST /api/vendors/{id}/claim`, which creates their account and attaches the
+   existing listing in one step, skipping step 1 entirely.
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `GET /api/vendors/me` | Vendor only | The calling vendor's own shop profile. `404` if not set up yet |
+| `PUT /api/vendors/me` | Vendor only | Creates the profile the first time (`201`), updates it thereafter (`200`) — same endpoint for both, `{ businessName, description?, categoryId, locationDescription, latitude?, longitude?, openingTime?, closingTime?, imageUrl? }` |
 
 ## Community vendors, reviews & notifications
 

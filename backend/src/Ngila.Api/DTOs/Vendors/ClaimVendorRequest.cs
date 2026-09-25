@@ -1,3 +1,5 @@
+using Ngila.Api.Models.Enums;
+
 namespace Ngila.Api.DTOs.Vendors;
 
 // Creates the vendor's account and attaches it to an existing unclaimed (community-added)
@@ -7,4 +9,5 @@ public record ClaimVendorRequest(
     string LastName,
     string Email,
     string? PhoneNumber,
-    string Password);
+    string Password,
+    Gender? Gender);

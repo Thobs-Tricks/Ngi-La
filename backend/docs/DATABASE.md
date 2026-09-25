@@ -42,6 +42,7 @@ erDiagram
         guid Id PK
         string FirstName
         string LastName
+        int Gender
         bool IsActive
         datetime CreatedAt
         datetime LastLoginAt
@@ -186,6 +187,7 @@ not as separate user tables).
 | `Id` | `uniqueidentifier` PK | |
 | `FirstName` | `nvarchar(100)` NOT NULL | Ngila-specific |
 | `LastName` | `nvarchar(100)` NOT NULL | Ngila-specific |
+| `Gender` | `int` NULL | Ngila-specific, optional. Serialized as a string (`"Male"`) over the API — see [`Gender`](#gender-enum) below |
 | `IsActive` | `bit` NOT NULL | Ngila-specific — soft disable without deleting the account |
 | `CreatedAt` | `datetime2` NOT NULL | Ngila-specific |
 | `LastLoginAt` | `datetime2` NULL | Ngila-specific |
@@ -236,6 +238,12 @@ a column) = `RevokedAt is null && ExpiresAt > now`.
 Either a claimed vendor (1:1 with an owning `AspNetUsers` row, enforced by the filtered unique
 index on `UserId`) or an **unclaimed, community-added** listing (`UserId IS NULL`) — the core
 mechanic behind Ngila's "add a vendor nobody's claimed yet" feature.
+
+Note that a `Vendor`-role `AspNetUsers` row can also exist with **zero** matching `VendorProfiles`
+rows: `POST /api/auth/register/vendor` only creates the account (personal details), not a shop
+profile - that's set up separately via `PUT /api/vendors/me` once logged in. The alternative path,
+`POST /api/vendors/{id}/claim`, creates the account *and* attaches an existing unclaimed
+`VendorProfile` in one step, skipping that gap entirely.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -332,9 +340,22 @@ vendor once it's claimed) — the only real trigger that exists today.
 
 This is a simplified starting point, not the full lifecycle described in the product docs
 (`Community Added → Pending Verification → Vendor Claimed → Verified → Active`, plus
-`Temporarily Closed` / `Moved` / etc.) — those states apply once community-added (unclaimed)
-vendor listings exist, which isn't built yet. Extend this enum when that feature lands rather
-than overloading these three values.
+`Temporarily Closed` / `Moved` / etc.). Community-added/claimed *is* now built, but as an
+orthogonal concept - `VendorProfiles.UserId is null` means "community-added, unclaimed" - rather
+than as extra `VendorStatus` values, so a listing's verification state and its claimed state can
+vary independently. Extend this enum only if a genuinely new *verification* state is needed
+(e.g. `Suspended` already covers admin takedown); claimed-vs-unclaimed doesn't belong here.
+
+### `Gender` (`AspNetUsers.Gender`)
+
+| Value | Meaning |
+|---|---|
+| `0` — `Female` | |
+| `1` — `Male` | |
+| `2` — `Other` | |
+
+Nullable and optional everywhere it's collected (every registration DTO). Serialized as a string
+over the API (`"Male"`, not `1`) via a global `JsonStringEnumConverter` in `Program.cs`.
 
 ## Indexes
 

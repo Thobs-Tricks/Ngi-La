@@ -148,7 +148,11 @@ builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // ---------- Controllers / Swagger ----------
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    // Enums (e.g. Gender) are sent/received as readable strings ("Male") rather than raw
+    // numbers - friendlier API contract, and the numeric value would be an implementation
+    // detail clients shouldn't need to hardcode.
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

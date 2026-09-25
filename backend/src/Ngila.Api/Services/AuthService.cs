@@ -6,6 +6,7 @@ using Ngila.Api.DTOs.Auth;
 using Ngila.Api.DTOs.Common;
 using Ngila.Api.DTOs.Vendors;
 using Ngila.Api.Models.Entities;
+using Ngila.Api.Models.Enums;
 using Ngila.Api.Services.Interfaces;
 
 namespace Ngila.Api.Services;
@@ -49,7 +50,7 @@ public class AuthService : IAuthService
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
         var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, Roles.Customer);
+            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Customer);
 
         if (!createResult.Succeeded || createResult.Data is null)
             return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
@@ -70,38 +71,19 @@ public class AuthService : IAuthService
 
     public async Task<ServiceResult<MessageResponse>> RegisterVendorAsync(RegisterVendorRequest request, CancellationToken ct = default)
     {
-        var categoryExists = await _context.Categories.AnyAsync(c => c.Id == request.CategoryId, ct);
-        if (!categoryExists)
-            return ServiceResult<MessageResponse>.Failure("Selected category does not exist.", 400);
-
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
-
+        // Personal account only - no VendorProfile is created here. The vendor sets up their
+        // shop (business name, category, location, hours) afterwards via PUT /api/vendors/me,
+        // once they're logged in. Claiming an existing community-added listing is the other way
+        // a Vendor-role account gets a profile - see ClaimVendorAsync.
         var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, Roles.Vendor);
+            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Vendor);
 
         if (!createResult.Succeeded || createResult.Data is null)
             return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
 
         var user = createResult.Data;
 
-        _context.VendorProfiles.Add(new VendorProfile
-        {
-            UserId = user.Id,
-            BusinessName = request.BusinessName,
-            Description = request.BusinessDescription,
-            CategoryId = request.CategoryId,
-            LocationDescription = request.LocationDescription,
-            Latitude = request.Latitude,
-            Longitude = request.Longitude,
-            OpeningTime = request.OpeningTime,
-            ClosingTime = request.ClosingTime,
-            ImageUrl = request.ImageUrl
-        });
-        await _context.SaveChangesAsync(ct);
-
         var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-        await transaction.CommitAsync(ct);
-
         await _emailService.SendEmailConfirmationAsync(user.Email!, user.Id, confirmationToken, ct);
 
         return ServiceResult<MessageResponse>.Success(
@@ -120,7 +102,7 @@ public class AuthService : IAuthService
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
         var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, Roles.Vendor);
+            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Vendor);
 
         if (!createResult.Succeeded || createResult.Data is null)
             return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
@@ -154,7 +136,7 @@ public class AuthService : IAuthService
         // Only reachable via [Authorize(Roles = Roles.Admin)] on the controller action - an existing
         // admin must vouch for a new one. There is no public admin self-registration endpoint.
         var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, Roles.Admin);
+            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Admin);
 
         if (!createResult.Succeeded || createResult.Data is null)
             return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
@@ -341,12 +323,13 @@ public class AuthService : IAuthService
         var roles = await _userManager.GetRolesAsync(user);
 
         return ServiceResult<CurrentUserResponse>.Success(new CurrentUserResponse(
-            user.Id, user.Email!, user.FirstName, user.LastName, user.PhoneNumber,
+            user.Id, user.Email!, user.FirstName, user.LastName, user.PhoneNumber, user.Gender,
             roles.FirstOrDefault() ?? string.Empty, user.EmailConfirmed, user.CreatedAt));
     }
 
     private async Task<ServiceResult<ApplicationUser>> CreateUserAsync(
-        string email, string firstName, string lastName, string? phoneNumber, string password, string role)
+        string email, string firstName, string lastName, string? phoneNumber, string password,
+        Gender? gender, string role)
     {
         var existing = await _userManager.FindByEmailAsync(email);
         if (existing is not null)
@@ -362,6 +345,7 @@ public class AuthService : IAuthService
             FirstName = firstName,
             LastName = lastName,
             PhoneNumber = phoneNumber,
+            Gender = gender,
         };
 
         var createResult = await _userManager.CreateAsync(user, password);

@@ -1,3 +1,4 @@
+using Ngila.Api.Common;
 using Ngila.Api.DTOs.Stats;
 using Ngila.Api.DTOs.Vendors;
 
@@ -12,4 +13,8 @@ public interface IVendorService
     Task<VendorResponse?> GetVendorByIdAsync(Guid id, decimal? latitude, decimal? longitude, CancellationToken ct = default);
     Task<VendorResponse> AddVendorAsync(Guid addedByUserId, AddVendorRequest request, CancellationToken ct = default);
     Task<PlatformStatsResponse> GetStatsAsync(CancellationToken ct = default);
+
+    // "MySpaza" - the calling vendor's own shop profile, created the first time they set it up.
+    Task<ServiceResult<VendorResponse>> GetOwnProfileAsync(Guid userId, CancellationToken ct = default);
+    Task<ServiceResult<VendorResponse>> UpsertOwnProfileAsync(Guid userId, UpsertVendorProfileRequest request, CancellationToken ct = default);
 }

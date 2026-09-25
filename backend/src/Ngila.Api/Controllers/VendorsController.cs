@@ -64,6 +64,33 @@ public class VendorsController : ControllerBase
     }
 
     /// <summary>
+    /// The calling vendor's own shop profile ("MySpaza"). 404 if they haven't set it up yet.
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize(Roles = Roles.Vendor)]
+    public async Task<IActionResult> GetMyProfile(CancellationToken ct)
+    {
+        var result = await _vendorService.GetOwnProfileAsync(User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    /// <summary>
+    /// Creates the calling vendor's shop profile if they don't have one yet, or updates it if
+    /// they do - what "MySpaza" setup/editing calls.
+    /// </summary>
+    [HttpPut("me")]
+    [Authorize(Roles = Roles.Vendor)]
+    public async Task<IActionResult> UpsertMyProfile(UpsertVendorProfileRequest request, CancellationToken ct)
+    {
+        var result = await _vendorService.UpsertOwnProfileAsync(User.GetUserId(), request, ct);
+        return result.Succeeded
+            ? StatusCode(result.StatusCode, result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    /// <summary>
     /// Community-add a vendor that isn't on Ngila yet. Starts unclaimed until the real
     /// business claims it via POST /api/vendors/{id}/claim.
     /// </summary>

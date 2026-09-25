@@ -1,17 +1,13 @@
+using Ngila.Api.Models.Enums;
+
 namespace Ngila.Api.DTOs.Auth;
 
+// Personal details only - the vendor's shop profile (business name, category, location, hours)
+// is set up separately after registration via PUT /api/vendors/me, once they're logged in.
 public record RegisterVendorRequest(
     string FirstName,
     string LastName,
     string Email,
     string? PhoneNumber,
     string Password,
-    string BusinessName,
-    string? BusinessDescription,
-    Guid CategoryId,
-    string LocationDescription,
-    decimal? Latitude,
-    decimal? Longitude,
-    TimeSpan? OpeningTime,
-    TimeSpan? ClosingTime,
-    string? ImageUrl);
+    Gender? Gender);

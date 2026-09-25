@@ -1,3 +1,5 @@
+using Ngila.Api.Models.Enums;
+
 namespace Ngila.Api.DTOs.Auth;
 
 public record RegisterCustomerRequest(
@@ -5,4 +7,5 @@ public record RegisterCustomerRequest(
     string LastName,
     string Email,
     string? PhoneNumber,
-    string Password);
+    string Password,
+    Gender? Gender);

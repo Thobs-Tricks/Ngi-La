@@ -92,6 +92,59 @@ public class VendorService : IVendorService
         return MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude);
     }
 
+    public async Task<ServiceResult<VendorResponse>> GetOwnProfileAsync(Guid userId, CancellationToken ct = default)
+    {
+        var vendor = await _context.VendorProfiles
+            .Include(v => v.User)
+            .Include(v => v.Category)
+            .FirstOrDefaultAsync(v => v.UserId == userId, ct);
+
+        if (vendor is null)
+            return ServiceResult<VendorResponse>.Failure("You haven't set up your shop profile yet.", 404);
+
+        return ServiceResult<VendorResponse>.Success(MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude));
+    }
+
+    public async Task<ServiceResult<VendorResponse>> UpsertOwnProfileAsync(Guid userId, UpsertVendorProfileRequest request, CancellationToken ct = default)
+    {
+        var categoryExists = await _context.Categories.AnyAsync(c => c.Id == request.CategoryId, ct);
+        if (!categoryExists)
+            return ServiceResult<VendorResponse>.Failure("Selected category does not exist.", 400);
+
+        var vendor = await _context.VendorProfiles
+            .Include(v => v.User)
+            .Include(v => v.Category)
+            .FirstOrDefaultAsync(v => v.UserId == userId, ct);
+
+        var isNew = vendor is null;
+        if (vendor is null)
+        {
+            vendor = new VendorProfile { UserId = userId, Status = VendorStatus.PendingVerification };
+            _context.VendorProfiles.Add(vendor);
+        }
+
+        vendor.BusinessName = request.BusinessName;
+        vendor.Description = request.Description;
+        vendor.CategoryId = request.CategoryId;
+        vendor.LocationDescription = request.LocationDescription;
+        vendor.Latitude = request.Latitude;
+        vendor.Longitude = request.Longitude;
+        vendor.OpeningTime = request.OpeningTime;
+        vendor.ClosingTime = request.ClosingTime;
+        vendor.ImageUrl = request.ImageUrl;
+
+        await _context.SaveChangesAsync(ct);
+
+        if (isNew)
+        {
+            vendor.User = await _context.Users.FirstAsync(u => u.Id == userId, ct);
+            vendor.Category = await _context.Categories.FirstAsync(c => c.Id == request.CategoryId, ct);
+        }
+
+        return ServiceResult<VendorResponse>.Success(
+            MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude), isNew ? 201 : 200);
+    }
+
     public async Task<PlatformStatsResponse> GetStatsAsync(CancellationToken ct = default)
     {
         var vendorCount = await DiscoverableVendors().CountAsync(ct);
