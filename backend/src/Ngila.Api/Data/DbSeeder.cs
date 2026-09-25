@@ -45,6 +45,23 @@ public static class DbSeeder
     private static async Task SeedAdminAsync(
         UserManager<ApplicationUser> userManager, AdminBootstrapSettings adminSettings, ILogger logger)
     {
+        // Backfill: an environment deployed before AdminTitle/RBAC existed has a bootstrap admin
+        // with AdminTitle == null, which silently locks them out of every OperationsAdmin-only
+        // action (including creating other admins) with no way back in through the API. Runs
+        // every startup, harmless once already backfilled - only touches the exact configured
+        // bootstrap email, and only while its title is still unset.
+        if (!string.IsNullOrWhiteSpace(adminSettings.Email))
+        {
+            var existingBootstrapAdmin = await userManager.FindByEmailAsync(adminSettings.Email);
+            if (existingBootstrapAdmin is not null && existingBootstrapAdmin.AdminTitle is null
+                && await userManager.IsInRoleAsync(existingBootstrapAdmin, Roles.Admin))
+            {
+                existingBootstrapAdmin.AdminTitle = AdminTitle.OperationsAdmin;
+                await userManager.UpdateAsync(existingBootstrapAdmin);
+                logger.LogInformation("Backfilled AdminTitle.OperationsAdmin for bootstrap admin {Email}.", adminSettings.Email);
+            }
+        }
+
         var anyAdmin = (await userManager.GetUsersInRoleAsync(Roles.Admin)).Any();
         if (anyAdmin)
             return;
