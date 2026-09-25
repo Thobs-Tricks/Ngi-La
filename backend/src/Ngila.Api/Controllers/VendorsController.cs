@@ -189,6 +189,38 @@ public class VendorsController : ControllerBase
             : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
     }
 
+    /// <summary>
+    /// Full vendor list for the admin "Claims &amp; Vendors" table - includes suspended and
+    /// unconfirmed listings that the public GET /api/vendors deliberately hides.
+    /// </summary>
+    [HttpGet("admin-list")]
+    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    public async Task<IActionResult> GetAdminVendors(CancellationToken ct)
+    {
+        var vendors = await _vendorService.GetAllForAdminAsync(ct);
+        return Ok(vendors);
+    }
+
+    [HttpPost("{id:guid}/suspend")]
+    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    public async Task<IActionResult> SuspendVendor(Guid id, CancellationToken ct)
+    {
+        var result = await _vendorService.SetSuspendedAsync(id, true, User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    [HttpPost("{id:guid}/unsuspend")]
+    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    public async Task<IActionResult> UnsuspendVendor(Guid id, CancellationToken ct)
+    {
+        var result = await _vendorService.SetSuspendedAsync(id, false, User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
     private static bool IsValidCoordinate(decimal? lat, decimal? lng, out string? error)
     {
         if (lat is < -90 or > 90)

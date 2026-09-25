@@ -1,3 +1,3 @@
 namespace Ngila.Api.DTOs.Vendors;
 
-public record CategoryResponse(Guid Id, string Name);
+public record CategoryResponse(Guid Id, string Name, int VendorCount);

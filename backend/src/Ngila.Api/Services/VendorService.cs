@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Ngila.Api.Common;
 using Ngila.Api.Data;
+using Ngila.Api.DTOs.Admin;
 using Ngila.Api.DTOs.Common;
 using Ngila.Api.DTOs.Stats;
 using Ngila.Api.DTOs.Vendors;
@@ -27,7 +28,7 @@ public class VendorService : IVendorService
     {
         return await _context.Categories
             .OrderBy(c => c.Name)
-            .Select(c => new CategoryResponse(c.Id, c.Name))
+            .Select(c => new CategoryResponse(c.Id, c.Name, c.VendorProfiles.Count))
             .ToListAsync(ct);
     }
 
@@ -42,7 +43,7 @@ public class VendorService : IVendorService
         _context.Categories.Add(category);
         await _context.SaveChangesAsync(ct);
 
-        return ServiceResult<CategoryResponse>.Success(new CategoryResponse(category.Id, category.Name), 201);
+        return ServiceResult<CategoryResponse>.Success(new CategoryResponse(category.Id, category.Name, 0), 201);
     }
 
     public async Task<IReadOnlyList<VendorResponse>> GetVendorsAsync(NearbyQuery query, CancellationToken ct = default)
@@ -269,6 +270,76 @@ public class VendorService : IVendorService
 
         return new PlatformStatsResponse(vendorCount, reviewCount, areaCount);
     }
+
+    public async Task<IReadOnlyList<AdminVendorResponse>> GetAllForAdminAsync(CancellationToken ct = default)
+    {
+        var vendors = await _context.VendorProfiles
+            .Include(v => v.Category)
+            .Include(v => v.AddedByUser)
+            .OrderByDescending(v => v.CreatedAt)
+            .ToListAsync(ct);
+
+        return vendors.Select(MapToAdminResponse).ToList();
+    }
+
+    public async Task<ServiceResult<AdminVendorResponse>> SetSuspendedAsync(Guid vendorId, bool suspended, Guid adminUserId, CancellationToken ct = default)
+    {
+        var vendor = await _context.VendorProfiles
+            .Include(v => v.Category)
+            .Include(v => v.AddedByUser)
+            .FirstOrDefaultAsync(v => v.Id == vendorId, ct);
+
+        if (vendor is null)
+            return ServiceResult<AdminVendorResponse>.Failure("Vendor not found.", 404);
+
+        // Suspension only makes sense for a vendor that was actually live (Verified) - a still-
+        // pending listing should go through reject-claim instead, not suspend.
+        if (suspended && vendor.Status != VendorStatus.Verified)
+            return ServiceResult<AdminVendorResponse>.Failure("Only verified vendors can be suspended.", 400);
+        if (!suspended && vendor.Status != VendorStatus.Suspended)
+            return ServiceResult<AdminVendorResponse>.Failure("This vendor isn't suspended.", 400);
+
+        vendor.Status = suspended ? VendorStatus.Suspended : VendorStatus.Verified;
+        await _context.SaveChangesAsync(ct);
+
+        if (vendor.UserId is not null)
+        {
+            await _notificationService.NotifyAsync(
+                vendor.UserId.Value,
+                suspended ? "Your listing was suspended" : "Your listing is active again",
+                suspended
+                    ? $"{vendor.BusinessName} has been suspended by Ngila and is no longer shown to customers."
+                    : $"{vendor.BusinessName} is active again and visible to customers.",
+                vendor.Id, ct);
+        }
+
+        await _activityLog.LogAsync(
+            adminUserId,
+            $"{(suspended ? "suspended" : "reinstated")} {vendor.BusinessName}",
+            suspended ? "vendor-suspended" : "vendor-reinstated", ct);
+
+        return ServiceResult<AdminVendorResponse>.Success(MapToAdminResponse(vendor));
+    }
+
+    private static AdminVendorResponse MapToAdminResponse(VendorProfile v) => new(
+        v.Id,
+        v.BusinessName,
+        v.Category?.Name ?? "Uncategorised",
+        v.LocationDescription ?? "Location not set",
+        DeriveAdminStatus(v),
+        v.Rating,
+        v.ReviewsCount,
+        v.AddedByUser is null ? null : DisplayFormatting.DisplayName(v.AddedByUser.FirstName, v.AddedByUser.LastName),
+        DisplayFormatting.RelativeTime(v.CreatedAt),
+        v.ImageUrl,
+        v.UserId is not null);
+
+    private static string DeriveAdminStatus(VendorProfile v) => v.Status switch
+    {
+        VendorStatus.Suspended => "Suspended",
+        VendorStatus.Verified => "Verified",
+        _ => v.UserId is null ? "CommunityAdded" : "Pending",
+    };
 
     // A vendor is publicly discoverable if it's not suspended, and either unclaimed (community
     // added, no account to confirm an email on) or its owner has confirmed their email - closes
