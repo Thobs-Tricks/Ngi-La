@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
+    public DbSet<EmailSettings> EmailSettings => Set<EmailSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -200,6 +201,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(a => a.CreatedAt);
+        });
+
+        builder.Entity<EmailSettings>(entity =>
+        {
+            // Strict singleton row (Id is always 1) - not an auto-increment surrogate key.
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.SenderEmail).HasMaxLength(256);
+            entity.Property(e => e.EncryptedAppPassword).HasMaxLength(500);
         });
     }
 }

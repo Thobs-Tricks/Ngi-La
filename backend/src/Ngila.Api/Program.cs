@@ -137,7 +137,8 @@ builder.Services.AddCors(options =>
 // ---------- App services ----------
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
+builder.Services.AddScoped<IEmailSettingsService, EmailSettingsService>();
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<IVendorService, VendorService>();
 builder.Services.AddScoped<IFeedService, FeedService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
