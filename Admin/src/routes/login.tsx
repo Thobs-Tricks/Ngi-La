@@ -1,4 +1,7 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
+import { ApiError } from "@/lib/api";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -11,6 +14,27 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      await navigate({ to: "/" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't log in. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-4 text-ink">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -83,7 +107,10 @@ function LoginPage() {
                 </Link>
               </div>
 
-              <form className="space-y-5">
+              <form className="space-y-5" onSubmit={onSubmit}>
+                {error ? (
+                  <p className="rounded-lg bg-clay/10 px-3 py-2 text-[13px] text-clay">{error}</p>
+                ) : null}
                 <div className="space-y-2">
                   <label htmlFor="email" className="font-mono text-[11px] uppercase tracking-[0.22em] text-mute">
                     Email
@@ -91,7 +118,9 @@ function LoginPage() {
                   <input
                     id="email"
                     type="email"
-                    defaultValue="thabo@ngila.app"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-mute focus:border-ember/60 focus:ring-2 focus:ring-ember/20"
                   />
                 </div>
@@ -101,47 +130,27 @@ function LoginPage() {
                     <label htmlFor="password" className="font-mono text-[11px] uppercase tracking-[0.22em] text-mute">
                       Password
                     </label>
-                    <button type="button" className="text-[12px] font-medium text-ember hover:underline">
-                      Forgot?
-                    </button>
                   </div>
                   <input
                     id="password"
                     type="password"
-                    defaultValue="••••••••"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-mute focus:border-ember/60 focus:ring-2 focus:ring-ember/20"
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-[13px] text-ink/75">
-                  <input type="checkbox" className="h-4 w-4 rounded border-line bg-surface text-ember focus:ring-ember/25" defaultChecked />
-                  Keep me signed in
-                </label>
-
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-ink px-4 py-3 text-[14px] font-semibold text-paper transition hover:bg-ink/90"
+                  disabled={submitting}
+                  className="w-full rounded-xl bg-ink px-4 py-3 text-[14px] font-semibold text-paper transition hover:bg-ink/90 disabled:opacity-60"
                 >
-                  Sign in
+                  {submitting ? "Signing in…" : "Sign in"}
                 </button>
               </form>
 
-              <div className="mt-7 flex items-center gap-3 text-[12px] text-mute">
-                <div className="h-px flex-1 bg-line" />
-                <span className="font-mono uppercase tracking-[0.22em]">or</span>
-                <div className="h-px flex-1 bg-line" />
-              </div>
-
-              <div className="mt-7 grid gap-3">
-                <button
-                  type="button"
-                  className="flex items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-[13px] font-medium text-ink transition hover:bg-surface/80"
-                >
-                  <span className="grid size-5 place-items-center rounded-full bg-ember/15 font-display text-[10px] text-ember">
-                    G
-                  </span>
-                  Continue with Google
-                </button>
+              <div className="mt-7">
                 <Link
                   to="/register"
                   className="text-center text-[13px] text-mute hover:text-ink"

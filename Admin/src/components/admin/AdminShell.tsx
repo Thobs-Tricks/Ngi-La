@@ -1,20 +1,23 @@
-import type { ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useEffect, type ReactNode } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
+import { fetchStats } from "@/lib/endpoints";
 
-type NavItem = { to: "/" | "/verification" | "/vendors" | "/categories" | "/reports" | "/users"; label: string; badge?: number; tone?: "ember" | "clay" };
+type NavItem = { to: "/" | "/verification" | "/vendors" | "/categories" | "/reports" | "/users"; label: string; badgeKey?: "verification" | "reports" };
 
 const inspect: NavItem[] = [
   { to: "/", label: "Overview" },
-  { to: "/verification", label: "Verification", badge: 14, tone: "ember" },
+  { to: "/verification", label: "Verification", badgeKey: "verification" },
   { to: "/vendors", label: "Claims & Vendors" },
   { to: "/categories", label: "Categories" },
-  { to: "/reports", label: "Reports", badge: 6, tone: "clay" },
+  { to: "/reports", label: "Reports", badgeKey: "reports" },
 ];
 
 const insight: NavItem[] = [{ to: "/users", label: "Users & Contributors" }];
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({ item, active, badge }: { item: NavItem; active: boolean; badge: number | undefined }) {
   return (
     <Link
       to={item.to}
@@ -24,18 +27,14 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
       )}
     >
       <span>{item.label}</span>
-      {item.badge ? (
+      {badge ? (
         <span
           className={cn(
             "grid size-5 place-items-center rounded-full font-mono text-[10px] font-medium",
-            active
-              ? "bg-paper/20 text-paper"
-              : item.tone === "clay"
-                ? "bg-clay/15 text-clay"
-                : "bg-ember/15 text-ember",
+            active ? "bg-paper/20 text-paper" : "bg-ember/15 text-ember",
           )}
         >
-          {item.badge}
+          {badge}
         </span>
       ) : null}
     </Link>
@@ -43,7 +42,34 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 }
 
 export function AdminShell({ children }: { children: ReactNode }) {
-  const path = useRouterState({ select: (s) => s.location.pathname });
+  const path = useRouterState({ select: (s: { location: { pathname: string } }) => s.location.pathname });
+  const navigate = useNavigate();
+  const { status, user, logout } = useAuth();
+
+  const { data: stats } = useQuery({
+    queryKey: ["admin-stats"],
+    queryFn: fetchStats,
+    enabled: status === "authenticated",
+  });
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      void navigate({ to: "/login" });
+    }
+  }, [status, navigate]);
+
+  if (status !== "authenticated") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper text-mute">
+        <p className="font-mono text-[12px] uppercase tracking-[0.2em]">Loading console…</p>
+      </div>
+    );
+  }
+
+  const badges = { verification: stats?.pendingVerification, reports: stats?.reportsOpen };
+  const initials = user
+    ? `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase()
+    : "";
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -71,25 +97,30 @@ export function AdminShell({ children }: { children: ReactNode }) {
             Inspect
           </p>
           {inspect.map((item) => (
-            <NavLink key={item.to} item={item} active={path === item.to} />
+            <NavLink key={item.to} item={item} active={path === item.to} badge={item.badgeKey ? badges[item.badgeKey] : undefined} />
           ))}
 
           <p className="mt-4 mb-1 px-2 font-mono text-[9px] uppercase tracking-[0.2em] text-mute">
             Insight
           </p>
           {insight.map((item) => (
-            <NavLink key={item.to} item={item} active={path === item.to} />
+            <NavLink key={item.to} item={item} active={path === item.to} badge={undefined} />
           ))}
 
-          <div className="mt-auto flex items-center gap-2.5 rounded-lg bg-ink/5 px-3 py-2.5">
+          <button
+            onClick={() => void logout()}
+            className="mt-auto flex items-center gap-2.5 rounded-lg bg-ink/5 px-3 py-2.5 text-left transition hover:bg-ink/10"
+          >
             <div className="grid size-8 place-items-center rounded-full bg-ember/20 font-display text-xs font-semibold text-ember">
-              TM
+              {initials}
             </div>
-            <div className="leading-tight">
-              <p className="text-[13px] font-medium">Thabo M.</p>
-              <p className="font-mono text-[10px] text-mute">Lead inspector</p>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-[13px] font-medium">{user?.firstName} {user?.lastName}</p>
+              <p className="font-mono text-[10px] text-mute">
+                Admin · Sign out
+              </p>
             </div>
-          </div>
+          </button>
         </aside>
 
         <main className="min-w-0 flex-1 space-y-6 px-4 py-6 md:px-8">
@@ -101,25 +132,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   placeholder="Search vendors, claims, reports…"
                   className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-mute"
                 />
-                <span className="rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-mute">
-                  ⌘K
-                </span>
               </div>
             </div>
-            <div className="ml-auto hidden items-center gap-1 rounded-lg bg-surface/60 p-1 text-[12px] font-medium ring-1 ring-line lg:flex">
-              <span className="rounded-md bg-ink px-2.5 py-1.5 text-paper">All regions</span>
-              <span className="rounded-md px-2.5 py-1.5 text-mute transition hover:text-ink">
-                Gauteng
-              </span>
-              <span className="rounded-md px-2.5 py-1.5 text-mute transition hover:text-ink">
-                KZN
-              </span>
-            </div>
-            <div className="hidden size-9 place-items-center rounded-full bg-moss/20 font-mono text-xs text-moss ring-1 ring-line sm:grid">
-              14
-            </div>
+            <div className="ml-auto" />
+            {stats ? (
+              <div className="hidden size-9 place-items-center rounded-full bg-moss/20 font-mono text-xs text-moss ring-1 ring-line sm:grid">
+                {stats.pendingVerification}
+              </div>
+            ) : null}
             <div className="grid size-9 place-items-center rounded-full bg-ink font-display text-xs font-semibold text-paper">
-              TM
+              {initials}
             </div>
           </header>
 

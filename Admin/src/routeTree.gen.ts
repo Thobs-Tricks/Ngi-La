@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CategoriesRouteImport } from './routes/categories'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as VendorsRouteImport } from './routes/vendors'
@@ -24,6 +26,16 @@ const IndexRoute = IndexRouteImport.update({
 const CategoriesRoute = CategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -50,6 +62,8 @@ const VerificationRoute = VerificationRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/categories': typeof CategoriesRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/vendors': typeof VendorsRoute
@@ -58,6 +72,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/categories': typeof CategoriesRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/vendors': typeof VendorsRoute
@@ -67,6 +83,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/categories': typeof CategoriesRoute
+  '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/reports': typeof ReportsRoute
   '/users': typeof UsersRoute
   '/vendors': typeof VendorsRoute
@@ -75,13 +93,30 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/categories' | '/reports' | '/users' | '/vendors' | '/verification'
+    | '/'
+    | '/categories'
+    | '/login'
+    | '/register'
+    | '/reports'
+    | '/users'
+    | '/vendors'
+    | '/verification'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/categories' | '/reports' | '/users' | '/vendors' | '/verification'
+  to:
+    | '/'
+    | '/categories'
+    | '/login'
+    | '/register'
+    | '/reports'
+    | '/users'
+    | '/vendors'
+    | '/verification'
   id:
     | '__root__'
     | '/'
     | '/categories'
+    | '/login'
+    | '/register'
     | '/reports'
     | '/users'
     | '/vendors'
@@ -91,6 +126,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CategoriesRoute: typeof CategoriesRoute
+  LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
   ReportsRoute: typeof ReportsRoute
   UsersRoute: typeof UsersRoute
   VendorsRoute: typeof VendorsRoute
@@ -111,6 +148,20 @@ declare module '@tanstack/react-router' {
       path: '/categories'
       fullPath: '/categories'
       preLoaderRoute: typeof CategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -147,6 +198,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CategoriesRoute: CategoriesRoute,
+  LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
   ReportsRoute: ReportsRoute,
   UsersRoute: UsersRoute,
   VendorsRoute: VendorsRoute,

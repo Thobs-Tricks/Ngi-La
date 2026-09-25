@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
+import { ApiError } from "@/lib/api";
+import { register as registerRequest } from "@/lib/endpoints";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -11,6 +15,80 @@ export const Route = createFileRoute("/register")({
 });
 
 function RegisterPage() {
+  const { status } = useAuth();
+
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper text-mute">
+        <p className="font-mono text-[12px] uppercase tracking-[0.2em]">Loading…</p>
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return (
+      <GateMessage
+        title="Sign in required"
+        body="New admin accounts are created by an existing admin. Sign in first, then come back here."
+      />
+    );
+  }
+
+  return <RegisterForm />;
+}
+
+function GateMessage({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4 text-ink">
+      <div className="w-full max-w-md rounded-[28px] border border-line bg-surface/80 p-8 text-center shadow-[0_30px_100px_rgba(26,23,18,0.10)]">
+        <h1 className="font-display text-2xl font-bold">{title}</h1>
+        <p className="mt-3 text-[14px] text-mute">{body}</p>
+        <Link
+          to="/login"
+          className="mt-6 inline-flex items-center justify-center rounded-xl bg-ink px-4 py-3 text-[14px] font-semibold text-paper transition hover:bg-ink/90"
+        >
+          Go to login
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function RegisterForm() {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setSubmitting(true);
+    try {
+      // This console only ever creates Admin accounts, so userType is always "Admin" here.
+      await registerRequest({
+        userType: "Admin",
+        firstName,
+        lastName,
+        email,
+        password,
+      });
+      setSuccess(`${firstName} ${lastName} can now log in with the password you set.`);
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't create the account. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-4 text-ink">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -38,7 +116,13 @@ function RegisterPage() {
                 </Link>
               </div>
 
-              <form className="space-y-4">
+              <form className="space-y-4" onSubmit={onSubmit}>
+                {error ? (
+                  <p className="rounded-lg bg-clay/10 px-3 py-2 text-[13px] text-clay">{error}</p>
+                ) : null}
+                {success ? (
+                  <p className="rounded-lg bg-moss/10 px-3 py-2 text-[13px] text-moss">{success}</p>
+                ) : null}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label htmlFor="firstName" className="font-mono text-[11px] uppercase tracking-[0.22em] text-mute">
@@ -47,7 +131,9 @@ function RegisterPage() {
                     <input
                       id="firstName"
                       type="text"
-                      defaultValue="Thabo"
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
                       className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-mute focus:border-ember/60 focus:ring-2 focus:ring-ember/20"
                     />
                   </div>
@@ -58,7 +144,9 @@ function RegisterPage() {
                     <input
                       id="lastName"
                       type="text"
-                      defaultValue="Mokoena"
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
                       className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-mute focus:border-ember/60 focus:ring-2 focus:ring-ember/20"
                     />
                   </div>
@@ -71,24 +159,11 @@ function RegisterPage() {
                   <input
                     id="email"
                     type="email"
-                    defaultValue="thabo@ngila.app"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-mute focus:border-ember/60 focus:ring-2 focus:ring-ember/20"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="role" className="font-mono text-[11px] uppercase tracking-[0.22em] text-mute">
-                    Role
-                  </label>
-                  <select
-                    id="role"
-                    defaultValue="admin"
-                    className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition focus:border-ember/60 focus:ring-2 focus:ring-ember/20"
-                  >
-                    <option value="admin">Operations admin</option>
-                    <option value="reviewer">Verification reviewer</option>
-                    <option value="community">Community manager</option>
-                  </select>
                 </div>
 
                 <div className="space-y-2">
@@ -98,41 +173,22 @@ function RegisterPage() {
                   <input
                     id="password"
                     type="password"
-                    defaultValue="••••••••"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-mute focus:border-ember/60 focus:ring-2 focus:ring-ember/20"
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-[13px] text-ink/75">
-                  <input type="checkbox" className="h-4 w-4 rounded border-line bg-surface text-ember focus:ring-ember/25" defaultChecked />
-                  Send me the weekly digest
-                </label>
-
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-ink px-4 py-3 text-[14px] font-semibold text-paper transition hover:bg-ink/90"
+                  disabled={submitting}
+                  className="w-full rounded-xl bg-ink px-4 py-3 text-[14px] font-semibold text-paper transition hover:bg-ink/90 disabled:opacity-60"
                 >
-                  Create account
+                  {submitting ? "Creating…" : "Create account"}
                 </button>
               </form>
-
-              <div className="mt-7 flex items-center gap-3 text-[12px] text-mute">
-                <div className="h-px flex-1 bg-line" />
-                <span className="font-mono uppercase tracking-[0.22em]">or</span>
-                <div className="h-px flex-1 bg-line" />
-              </div>
-
-              <div className="mt-7">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-[13px] font-medium text-ink transition hover:bg-surface/80"
-                >
-                  <span className="grid size-5 place-items-center rounded-full bg-ember/15 font-display text-[10px] text-ember">
-                    G
-                  </span>
-                  Continue with Google
-                </button>
-              </div>
             </div>
           </div>
 

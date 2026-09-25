@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import type { VendorStatus } from "@/data/ngila";
+import type { VendorAdminStatus } from "@/lib/types";
 
 export function Panel({
   className,
@@ -45,23 +45,28 @@ export function MonoLabel({ children, className }: { children: ReactNode; classN
   return <p className={cn("label-mono", className)}>{children}</p>;
 }
 
-const statusTone: Record<VendorStatus, string> = {
+const statusTone: Record<VendorAdminStatus, string> = {
   Verified: "bg-moss/15 text-moss",
   Pending: "bg-amber/15 text-amber",
-  "Vendor claimed": "bg-ink/10 text-ink",
-  "Community added": "bg-paper text-mute ring-1 ring-line",
+  CommunityAdded: "bg-paper text-mute ring-1 ring-line",
   Suspended: "bg-clay/15 text-clay",
 };
 
-const statusDot: Record<VendorStatus, string> = {
+const statusDot: Record<VendorAdminStatus, string> = {
   Verified: "bg-moss",
   Pending: "bg-amber",
-  "Vendor claimed": "bg-ink",
-  "Community added": "bg-mute",
+  CommunityAdded: "bg-mute",
   Suspended: "bg-clay",
 };
 
-export function StatusPill({ status }: { status: VendorStatus }) {
+const statusLabel: Record<VendorAdminStatus, string> = {
+  Verified: "Verified",
+  Pending: "Pending",
+  CommunityAdded: "Community added",
+  Suspended: "Suspended",
+};
+
+export function StatusPill({ status }: { status: VendorAdminStatus }) {
   return (
     <span
       className={cn(
@@ -70,7 +75,7 @@ export function StatusPill({ status }: { status: VendorStatus }) {
       )}
     >
       <span className={cn("size-1.5 rounded-full", statusDot[status])} />
-      {status}
+      {statusLabel[status]}
     </span>
   );
 }
@@ -127,16 +132,19 @@ export function GhostButton({
   children,
   onClick,
   className,
+  disabled,
 }: {
   children: ReactNode;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        "rounded-lg bg-surface/70 px-3 py-2 text-[13px] font-medium ring-1 ring-line transition hover:bg-surface",
+        "rounded-lg bg-surface/70 px-3 py-2 text-[13px] font-medium ring-1 ring-line transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60",
         className,
       )}
     >
@@ -149,16 +157,19 @@ export function SolidButton({
   children,
   onClick,
   className,
+  disabled,
 }: {
   children: ReactNode;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        "rounded-lg bg-ink px-3.5 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/90",
+        "rounded-lg bg-ink px-3.5 py-2 text-[13px] font-medium text-paper transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-60",
         className,
       )}
     >
