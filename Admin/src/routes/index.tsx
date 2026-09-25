@@ -38,8 +38,6 @@ function Overview() {
   const { data: vendors } = useQuery({ queryKey: ["admin-vendors"], queryFn: fetchAdminVendors, enabled });
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories, enabled });
 
-  if (!enabled) return null;
-
   const statCards = stats
     ? [
         { label: "Total vendors", value: stats.totalVendors.toLocaleString(), note: "across the network", tone: "moss" as const },
