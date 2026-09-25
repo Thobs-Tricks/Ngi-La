@@ -1,4 +1,5 @@
 using Ngila.Api.Common;
+using Ngila.Api.DTOs.Common;
 using Ngila.Api.DTOs.Stats;
 using Ngila.Api.DTOs.Vendors;
 
@@ -9,6 +10,7 @@ public record NearbyQuery(decimal? Latitude, decimal? Longitude, Guid? CategoryI
 public interface IVendorService
 {
     Task<IReadOnlyList<CategoryResponse>> GetCategoriesAsync(CancellationToken ct = default);
+    Task<ServiceResult<CategoryResponse>> CreateCategoryAsync(CategoryCreateRequest request, CancellationToken ct = default);
     Task<IReadOnlyList<VendorResponse>> GetVendorsAsync(NearbyQuery query, CancellationToken ct = default);
     Task<VendorResponse?> GetVendorByIdAsync(Guid id, decimal? latitude, decimal? longitude, CancellationToken ct = default);
     Task<VendorResponse> AddVendorAsync(Guid addedByUserId, AddVendorRequest request, CancellationToken ct = default);
@@ -17,4 +19,10 @@ public interface IVendorService
     // "MySpaza" - the calling vendor's own shop profile, created the first time they set it up.
     Task<ServiceResult<VendorResponse>> GetOwnProfileAsync(Guid userId, CancellationToken ct = default);
     Task<ServiceResult<VendorResponse>> UpsertOwnProfileAsync(Guid userId, UpsertVendorProfileRequest request, CancellationToken ct = default);
+
+    // Admin verification queue: vendors with a claimant (UserId set) still awaiting a decision.
+    Task<IReadOnlyList<VerificationQueueItemResponse>> GetVerificationQueueAsync(CancellationToken ct = default);
+    Task<ServiceResult<VendorResponse>> VerifyVendorAsync(Guid vendorId, Guid adminUserId, CancellationToken ct = default);
+    Task<ServiceResult<MessageResponse>> RejectClaimAsync(Guid vendorId, Guid adminUserId, CancellationToken ct = default);
+    Task<ServiceResult<MessageResponse>> RequestInfoAsync(Guid vendorId, RequestInfoRequest request, CancellationToken ct = default);
 }

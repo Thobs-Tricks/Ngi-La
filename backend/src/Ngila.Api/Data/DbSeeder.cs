@@ -64,6 +64,9 @@ public static class DbSeeder
             FirstName = adminSettings.FirstName ?? "Ngila",
             LastName = adminSettings.LastName ?? "Admin",
             EmailConfirmed = true,
+            // OperationsAdmin so the very first admin can actually create/manage other admins
+            // and categories - the two things only that title is allowed to do.
+            AdminTitle = AdminTitle.OperationsAdmin,
         };
 
         var result = await userManager.CreateAsync(admin, adminSettings.Password);

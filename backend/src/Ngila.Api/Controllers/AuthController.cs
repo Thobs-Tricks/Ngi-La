@@ -1,8 +1,10 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Ngila.Api.Common;
 using Ngila.Api.DTOs.Auth;
+using Ngila.Api.Models.Enums;
 using Ngila.Api.Services.Interfaces;
 
 namespace Ngila.Api.Controllers;
@@ -20,14 +22,17 @@ public class AuthController : ControllerBase
     }
 
     // Public route (Customer/Vendor must be self-serve), but creating UserType.Admin still
-    // requires the caller to already hold a valid Admin session - checked here, not by the
-    // route's own authorization, since the route itself can't be anonymous-for-some-bodies.
+    // requires the caller to already be an OperationsAdmin - checked here, not by the route's
+    // own authorization, since the route itself can't be anonymous-for-some-bodies.
     [HttpPost("register")]
     [AllowAnonymous]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
     {
-        var callerIsAdmin = User.Identity?.IsAuthenticated == true && User.IsInRole(Roles.Admin);
-        var result = await _authService.RegisterAsync(request, callerIsAdmin, ct);
+        var isAuthenticatedAdmin = User.Identity?.IsAuthenticated == true && User.IsInRole(Roles.Admin);
+        var callerAdminTitle = User.FindFirstValue(AdminPolicies.AdminTitleClaimType);
+        var callerCanCreateAdmins = isAuthenticatedAdmin && callerAdminTitle == nameof(AdminTitle.OperationsAdmin);
+
+        var result = await _authService.RegisterAsync(request, callerCanCreateAdmins, ct);
         return FromResult(result);
     }
 

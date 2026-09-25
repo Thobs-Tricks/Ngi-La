@@ -10,5 +10,6 @@ public record CurrentUserResponse(
     string? PhoneNumber,
     Gender? Gender,
     string Role,
+    AdminTitle? AdminTitle,
     bool EmailConfirmed,
     DateTime CreatedAt);

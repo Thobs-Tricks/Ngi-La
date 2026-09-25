@@ -144,6 +144,51 @@ public class VendorsController : ControllerBase
             : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
     }
 
+    /// <summary>
+    /// Admin verification queue: vendors with a claimant awaiting a decision.
+    /// </summary>
+    [HttpGet("verification-queue")]
+    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    public async Task<IActionResult> GetVerificationQueue(CancellationToken ct)
+    {
+        var queue = await _vendorService.GetVerificationQueueAsync(ct);
+        return Ok(queue);
+    }
+
+    [HttpPost("{id:guid}/verify")]
+    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    public async Task<IActionResult> VerifyVendor(Guid id, CancellationToken ct)
+    {
+        var result = await _vendorService.VerifyVendorAsync(id, User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    /// <summary>
+    /// Rejects the pending claim (reverts the listing to unclaimed) - not the same as suspending
+    /// the listing itself.
+    /// </summary>
+    [HttpPost("{id:guid}/reject-claim")]
+    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    public async Task<IActionResult> RejectClaim(Guid id, CancellationToken ct)
+    {
+        var result = await _vendorService.RejectClaimAsync(id, User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    [HttpPost("{id:guid}/request-info")]
+    [Authorize(Policy = AdminPolicies.CanManageVendorVerification)]
+    public async Task<IActionResult> RequestInfo(Guid id, RequestInfoRequest request, CancellationToken ct)
+    {
+        var result = await _vendorService.RequestInfoAsync(id, request, ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
     private static bool IsValidCoordinate(decimal? lat, decimal? lng, out string? error)
     {
         if (lat is < -90 or > 90)

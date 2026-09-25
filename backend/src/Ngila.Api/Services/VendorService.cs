@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Ngila.Api.Common;
 using Ngila.Api.Data;
+using Ngila.Api.DTOs.Common;
 using Ngila.Api.DTOs.Stats;
 using Ngila.Api.DTOs.Vendors;
 using Ngila.Api.Models.Entities;
@@ -12,10 +13,14 @@ namespace Ngila.Api.Services;
 public class VendorService : IVendorService
 {
     private readonly ApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
+    private readonly IActivityLogService _activityLog;
 
-    public VendorService(ApplicationDbContext context)
+    public VendorService(ApplicationDbContext context, INotificationService notificationService, IActivityLogService activityLog)
     {
         _context = context;
+        _notificationService = notificationService;
+        _activityLog = activityLog;
     }
 
     public async Task<IReadOnlyList<CategoryResponse>> GetCategoriesAsync(CancellationToken ct = default)
@@ -24,6 +29,20 @@ public class VendorService : IVendorService
             .OrderBy(c => c.Name)
             .Select(c => new CategoryResponse(c.Id, c.Name))
             .ToListAsync(ct);
+    }
+
+    public async Task<ServiceResult<CategoryResponse>> CreateCategoryAsync(CategoryCreateRequest request, CancellationToken ct = default)
+    {
+        var name = request.Name.Trim();
+        var exists = await _context.Categories.AnyAsync(c => c.Name == name, ct);
+        if (exists)
+            return ServiceResult<CategoryResponse>.Failure("A category with this name already exists.", 409);
+
+        var category = new Category { Name = name };
+        _context.Categories.Add(category);
+        await _context.SaveChangesAsync(ct);
+
+        return ServiceResult<CategoryResponse>.Success(new CategoryResponse(category.Id, category.Name), 201);
     }
 
     public async Task<IReadOnlyList<VendorResponse>> GetVendorsAsync(NearbyQuery query, CancellationToken ct = default)
@@ -89,6 +108,8 @@ public class VendorService : IVendorService
         var category = await _context.Categories.FirstAsync(c => c.Id == request.CategoryId, ct);
         vendor.Category = category;
 
+        await _activityLog.LogAsync(addedByUserId, $"added {vendor.BusinessName}", "vendor-added", ct);
+
         return MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude);
     }
 
@@ -143,6 +164,97 @@ public class VendorService : IVendorService
 
         return ServiceResult<VendorResponse>.Success(
             MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude), isNew ? 201 : 200);
+    }
+
+    public async Task<IReadOnlyList<VerificationQueueItemResponse>> GetVerificationQueueAsync(CancellationToken ct = default)
+    {
+        var pending = await _context.VendorProfiles
+            .Include(v => v.User)
+            .Include(v => v.Category)
+            .Include(v => v.AddedByUser)
+            .Where(v => v.Status == VendorStatus.PendingVerification && v.UserId != null)
+            .OrderBy(v => v.CreatedAt)
+            .ToListAsync(ct);
+
+        return pending.Select(v => new VerificationQueueItemResponse(
+            v.Id,
+            v.BusinessName,
+            v.Category?.Name ?? "Uncategorised",
+            v.LocationDescription ?? "Location not set",
+            DisplayFormatting.DisplayName(v.User!.FirstName, v.User.LastName),
+            v.User.Email!,
+            v.AddedByUser is null ? null : DisplayFormatting.DisplayName(v.AddedByUser.FirstName, v.AddedByUser.LastName),
+            v.Description,
+            v.ImageUrl,
+            DisplayFormatting.RelativeTime(v.CreatedAt))).ToList();
+    }
+
+    public async Task<ServiceResult<VendorResponse>> VerifyVendorAsync(Guid vendorId, Guid adminUserId, CancellationToken ct = default)
+    {
+        var vendor = await _context.VendorProfiles
+            .Include(v => v.User)
+            .Include(v => v.Category)
+            .FirstOrDefaultAsync(v => v.Id == vendorId, ct);
+
+        if (vendor is null)
+            return ServiceResult<VendorResponse>.Failure("Vendor not found.", 404);
+
+        vendor.Status = VendorStatus.Verified;
+        await _context.SaveChangesAsync(ct);
+
+        if (vendor.UserId is not null)
+        {
+            await _notificationService.NotifyAsync(
+                vendor.UserId.Value, "You're verified!",
+                $"{vendor.BusinessName} has been verified by Ngila and is now shown as a trusted listing.",
+                vendor.Id, ct);
+        }
+
+        await _activityLog.LogAsync(adminUserId, $"verified {vendor.BusinessName}", "vendor-verified", ct);
+
+        return ServiceResult<VendorResponse>.Success(MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude));
+    }
+
+    public async Task<ServiceResult<MessageResponse>> RejectClaimAsync(Guid vendorId, Guid adminUserId, CancellationToken ct = default)
+    {
+        var vendor = await _context.VendorProfiles.FirstOrDefaultAsync(v => v.Id == vendorId, ct);
+        if (vendor is null)
+            return ServiceResult<MessageResponse>.Failure("Vendor not found.", 404);
+
+        var claimantUserId = vendor.UserId;
+        if (claimantUserId is null)
+            return ServiceResult<MessageResponse>.Failure("This vendor has no pending claim to reject.", 400);
+
+        // Revert to unclaimed rather than suspending - the claim itself is what's being rejected
+        // (e.g. failed ID/GPS checks), not necessarily the underlying business listing, which
+        // stays discoverable for a legitimate owner to claim later.
+        vendor.UserId = null;
+        await _context.SaveChangesAsync(ct);
+
+        await _notificationService.NotifyAsync(
+            claimantUserId.Value, "Your claim wasn't approved",
+            $"Your claim on {vendor.BusinessName} was not approved. The listing is now open for claiming again.",
+            vendor.Id, ct);
+
+        await _activityLog.LogAsync(adminUserId, $"rejected a claim on {vendor.BusinessName}", "claim-rejected", ct);
+
+        return ServiceResult<MessageResponse>.Success(new MessageResponse("Claim rejected. The listing is unclaimed again."));
+    }
+
+    public async Task<ServiceResult<MessageResponse>> RequestInfoAsync(Guid vendorId, RequestInfoRequest request, CancellationToken ct = default)
+    {
+        var vendor = await _context.VendorProfiles.FirstOrDefaultAsync(v => v.Id == vendorId, ct);
+        if (vendor is null)
+            return ServiceResult<MessageResponse>.Failure("Vendor not found.", 404);
+
+        if (vendor.UserId is null)
+            return ServiceResult<MessageResponse>.Failure("This vendor has no claimant to contact.", 400);
+
+        await _notificationService.NotifyAsync(
+            vendor.UserId.Value, $"More info needed for {vendor.BusinessName}",
+            request.Message, vendor.Id, ct);
+
+        return ServiceResult<MessageResponse>.Success(new MessageResponse("Request sent to the claimant."));
     }
 
     public async Task<PlatformStatsResponse> GetStatsAsync(CancellationToken ct = default)

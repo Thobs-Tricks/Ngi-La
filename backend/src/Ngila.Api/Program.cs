@@ -9,10 +9,12 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Ngila.Api.Common;
 using Ngila.Api.Configuration;
 using Ngila.Api.Data;
 using Ngila.Api.Middleware;
 using Ngila.Api.Models.Entities;
+using Ngila.Api.Models.Enums;
 using Ngila.Api.Services;
 using Ngila.Api.Services.Interfaces;
 
@@ -89,7 +91,27 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+// Admin sub-role permission matrix (see Common/AdminPolicies.cs). Each policy also requires the
+// Admin Identity role explicitly, even though only Admin accounts ever carry the admin_title
+// claim in practice - defense in depth against the claim somehow being set without the role.
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AdminPolicies.CanManageVendorVerification, policy => policy
+        .RequireRole(Roles.Admin)
+        .RequireClaim(AdminPolicies.AdminTitleClaimType, nameof(AdminTitle.OperationsAdmin), nameof(AdminTitle.VerificationReviewer)));
+
+    options.AddPolicy(AdminPolicies.CanManageCategories, policy => policy
+        .RequireRole(Roles.Admin)
+        .RequireClaim(AdminPolicies.AdminTitleClaimType, nameof(AdminTitle.OperationsAdmin)));
+
+    options.AddPolicy(AdminPolicies.CanManageReports, policy => policy
+        .RequireRole(Roles.Admin)
+        .RequireClaim(AdminPolicies.AdminTitleClaimType, nameof(AdminTitle.OperationsAdmin), nameof(AdminTitle.CommunityManager)));
+
+    options.AddPolicy(AdminPolicies.CanViewUsers, policy => policy
+        .RequireRole(Roles.Admin)
+        .RequireClaim(AdminPolicies.AdminTitleClaimType, nameof(AdminTitle.OperationsAdmin), nameof(AdminTitle.CommunityManager)));
+});
 
 // ---------- Rate limiting (protects auth endpoints from brute-force / credential stuffing) ----------
 builder.Services.AddRateLimiter(options =>
@@ -142,6 +164,9 @@ builder.Services.AddScoped<IVendorService, VendorService>();
 builder.Services.AddScoped<IFeedService, FeedService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 // ---------- Validation ----------
 builder.Services.AddFluentValidationAutoValidation();
