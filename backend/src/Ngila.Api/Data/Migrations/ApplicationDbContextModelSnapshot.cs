@@ -153,6 +153,37 @@ namespace Ngila.Api.Data.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Ngila.Api.Models.Entities.ActivityLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Tone")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("ActivityLogEntries");
+                });
+
             modelBuilder.Entity("Ngila.Api.Models.Entities.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -180,6 +211,9 @@ namespace Ngila.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("Gender")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -238,6 +272,25 @@ namespace Ngila.Api.Data.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Ngila.Api.Models.Entities.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Categories");
+                });
+
             modelBuilder.Entity("Ngila.Api.Models.Entities.CustomerProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -256,6 +309,85 @@ namespace Ngila.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("CustomerProfiles");
+                });
+
+            modelBuilder.Entity("Ngila.Api.Models.Entities.FeedPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuthorDisplayRole")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("AuthorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("CommentsCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LikesCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("VendorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorUserId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("VendorId");
+
+                    b.ToTable("FeedPosts");
+                });
+
+            modelBuilder.Entity("Ngila.Api.Models.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("VendorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VendorId");
+
+                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("Ngila.Api.Models.Entities.RefreshToken", b =>
@@ -305,16 +437,124 @@ namespace Ngila.Api.Data.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("Ngila.Api.Models.Entities.Report", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ReporterUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ResolvedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("TargetReviewId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("TargetVendorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("IsResolved");
+
+                    b.HasIndex("ReporterUserId");
+
+                    b.HasIndex("ResolvedByUserId");
+
+                    b.HasIndex("TargetReviewId");
+
+                    b.HasIndex("TargetVendorId");
+
+                    b.ToTable("Reports");
+                });
+
+            modelBuilder.Entity("Ngila.Api.Models.Entities.Review", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("VendorId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("Reviews");
+                });
+
             modelBuilder.Entity("Ngila.Api.Models.Entities.VendorProfile", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AddedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("BusinessName")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<TimeSpan?>("ClosingTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -323,16 +563,47 @@ namespace Ngila.Api.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<string>("LocationDescription")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(10, 6)
+                        .HasColumnType("decimal(10,6)");
+
+                    b.Property<TimeSpan?>("OpeningTime")
+                        .HasColumnType("time");
+
+                    b.Property<decimal>("Rating")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("decimal(3,2)");
+
+                    b.Property<int>("ReviewsCount")
+                        .HasColumnType("int");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AddedByUserId");
+
+                    b.HasIndex("CategoryId");
+
                     b.HasIndex("UserId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[UserId] IS NOT NULL");
 
                     b.ToTable("VendorProfiles");
                 });
@@ -388,6 +659,17 @@ namespace Ngila.Api.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Ngila.Api.Models.Entities.ActivityLogEntry", b =>
+                {
+                    b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActorUser");
+                });
+
             modelBuilder.Entity("Ngila.Api.Models.Entities.CustomerProfile", b =>
                 {
                     b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "User")
@@ -397,6 +679,42 @@ namespace Ngila.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Ngila.Api.Models.Entities.FeedPost", b =>
+                {
+                    b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "AuthorUser")
+                        .WithMany()
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Ngila.Api.Models.Entities.VendorProfile", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AuthorUser");
+
+                    b.Navigation("Vendor");
+                });
+
+            modelBuilder.Entity("Ngila.Api.Models.Entities.Notification", b =>
+                {
+                    b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Ngila.Api.Models.Entities.VendorProfile", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
+
+                    b.Navigation("Vendor");
                 });
 
             modelBuilder.Entity("Ngila.Api.Models.Entities.RefreshToken", b =>
@@ -410,13 +728,77 @@ namespace Ngila.Api.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Ngila.Api.Models.Entities.Report", b =>
+                {
+                    b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "ReporterUser")
+                        .WithMany()
+                        .HasForeignKey("ReporterUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "ResolvedByUser")
+                        .WithMany()
+                        .HasForeignKey("ResolvedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Ngila.Api.Models.Entities.Review", "TargetReview")
+                        .WithMany()
+                        .HasForeignKey("TargetReviewId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Ngila.Api.Models.Entities.VendorProfile", "TargetVendor")
+                        .WithMany()
+                        .HasForeignKey("TargetVendorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ReporterUser");
+
+                    b.Navigation("ResolvedByUser");
+
+                    b.Navigation("TargetReview");
+
+                    b.Navigation("TargetVendor");
+                });
+
+            modelBuilder.Entity("Ngila.Api.Models.Entities.Review", b =>
+                {
+                    b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Ngila.Api.Models.Entities.VendorProfile", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+
+                    b.Navigation("Vendor");
+                });
+
             modelBuilder.Entity("Ngila.Api.Models.Entities.VendorProfile", b =>
                 {
+                    b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Ngila.Api.Models.Entities.Category", "Category")
+                        .WithMany("VendorProfiles")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Ngila.Api.Models.Entities.ApplicationUser", "User")
                         .WithOne("VendorProfile")
                         .HasForeignKey("Ngila.Api.Models.Entities.VendorProfile", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("Category");
 
                     b.Navigation("User");
                 });
@@ -428,6 +810,11 @@ namespace Ngila.Api.Data.Migrations
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("VendorProfile");
+                });
+
+            modelBuilder.Entity("Ngila.Api.Models.Entities.Category", b =>
+                {
+                    b.Navigation("VendorProfiles");
                 });
 #pragma warning restore 612, 618
         }

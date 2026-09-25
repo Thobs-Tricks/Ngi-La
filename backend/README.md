@@ -46,7 +46,7 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 
    `AdminBootstrap` creates the **first** Admin account automatically on startup (only if no
    Admin exists yet). Every subsequent Admin must be created by an existing Admin via
-   `POST /api/auth/register/admin` — there's no public admin self-registration route.
+   `POST /api/auth/register` with `userType: "Admin"` while authenticated as one — see below.
 
 3. **Apply migrations**:
 
@@ -67,9 +67,7 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 
 | Endpoint | Auth | Notes |
 |---|---|---|
-| `POST /api/auth/register/customer` | Public | Creates Customer + profile, sends email confirmation |
-| `POST /api/auth/register/vendor` | Public | Creates Vendor + profile, sends email confirmation |
-| `POST /api/auth/register/admin` | Admin only | Existing admin vouches for a new one |
+| `POST /api/auth/register` | Public\* | One endpoint for all three account types — see below |
 | `POST /api/auth/login` | Public | Returns access token (15 min) + refresh token (7 days) |
 | `POST /api/auth/refresh` | Public | Rotates refresh token; reuse of a revoked token revokes **all** sessions |
 | `POST /api/auth/revoke` | Public | Logout — revokes a specific refresh token |
@@ -79,7 +77,126 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 | `POST /api/auth/change-password` | Authenticated | Revokes all sessions on success |
 | `GET /api/auth/me` | Authenticated | Current user profile |
 
-All `/api/auth/*` endpoints are rate-limited (10 requests/min/IP).
+All `/api/auth/*` endpoints are rate-limited (10 requests/min/IP). Passwords are sent once —
+there is no `confirmPassword`/`confirmNewPassword` field anywhere in the API; matching the two
+password fields is a client-side concern only.
+
+Enums (`userType`, `gender`, and any future ones) are sent/received as readable strings
+(`"Vendor"`, not `1`) — set globally via `JsonStringEnumConverter` in `Program.cs`.
+
+### `POST /api/auth/register`
+
+One shape for all three account types:
+
+```json
+{
+  "userType": "Customer" | "Vendor" | "Admin",
+  "firstName": "...",
+  "lastName": "...",
+  "email": "...",
+  "phoneNumber": "...",   // optional
+  "password": "...",
+  "gender": "Female" | "Male" | "Other"   // optional
+}
+```
+
+\* The route itself is anonymous-reachable (Customer/Vendor must be publicly self-serve), but
+`userType: "Admin"` is rejected with `403` unless the caller is already authenticated **as an
+Admin** — checked inside the handler (`AuthService.RegisterAsync`), since the route can't declare
+`[Authorize]` for only some request bodies. **Don't remove that check without replacing it** —
+it's the only thing stopping anonymous self-service Admin creation now that Customer, Vendor and
+Admin share one endpoint. There is only one Admin type — every admin account has identical
+permissions, no sub-roles.
+
+Side effects differ by type, same as before the endpoints were merged:
+- **Customer** — creates a `CustomerProfile` row, sends confirmation email
+- **Vendor** — no profile created (set up separately via `PUT /api/vendors/me`), sends confirmation email
+- **Admin** — email pre-confirmed (trusted peer created it), no confirmation email sent
+
+## Discovery & feed endpoints
+
+Public, read-only, no auth required. Rate-limited more generously than auth (60 requests/min/IP).
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/categories` | List of vendor categories |
+| `GET /api/vendors` | Query params: `lat`, `lng`, `categoryId`, `search` (all optional). Sorted by distance from the given coordinates; defaults to Johannesburg CBD if omitted |
+| `GET /api/vendors/{id}` | Vendor detail, including raw `latitude`/`longitude` (for building a maps deep link) |
+| `GET /api/vendors/{id}/reviews` | Reviews for one vendor, newest first |
+| `GET /api/feed` | Recent community feed posts. Optional `take` (default 20, max 50) |
+| `GET /api/stats` | Platform-wide counts (vendors, reviews, areas) — backs the home screen's stat cards |
+
+A vendor is discoverable if it isn't suspended, and either has no owner yet (community-added, see
+below) or its owner has confirmed their email — an unconfirmed self-registration doesn't appear
+as a public listing. `rating`/`reviewsCount` are system-set only, updated by `POST .../reviews`,
+never accepted from a vendor's own registration/profile request.
+
+## Vendor onboarding: two ways to end up with a shop profile
+
+Registering a Vendor account (`POST /api/auth/register` with `userType: "Vendor"`) creates a bare account with no
+shop profile yet — the vendor app's "MySpaza" screen is where that actually gets set up. There
+are two independent paths to owning a `VendorProfile`:
+
+1. **Self-registration → set up shop later**: register → confirm email → log in → `PUT /api/vendors/me`
+   whenever ready (see below).
+2. **Claim an existing community-added listing**: someone already added this business via
+   `POST /api/vendors` before its real owner ever signed up (see next section) — the owner finds
+   it and calls `POST /api/vendors/{id}/claim`, which creates their account and attaches the
+   existing listing in one step, skipping step 1 entirely.
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `GET /api/vendors/me` | Vendor only | The calling vendor's own shop profile. `404` if not set up yet |
+| `PUT /api/vendors/me` | Vendor only | Creates the profile the first time (`201`), updates it thereafter (`200`) — same endpoint for both, `{ businessName, description?, categoryId, locationDescription, latitude?, longitude?, openingTime?, closingTime?, imageUrl? }` |
+
+## Community vendors, reviews & notifications
+
+These back the customer app's "+ Add Vendor", "Rate Vendor" and notification-bell actions.
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `POST /api/vendors` | Authenticated | Community-add a vendor Ngila doesn't know about yet. Starts **unclaimed** (`claimed: false`, no owning account) |
+| `POST /api/vendors/{id}/claim` | Public | The real business claims an unclaimed listing — creates their account and attaches it in one step. `409` if already claimed. Notifies whoever added it |
+| `POST /api/vendors/{id}/reviews` | Authenticated | `{ rating: 1-5, comment? }`. Resubmitting updates your existing review (one per user per vendor) rather than creating a duplicate; `rating`/`reviewsCount` on the vendor update via a running weighted average, not a full table scan |
+| `GET /api/notifications` | Authenticated | Current user's notifications, newest first |
+| `POST /api/notifications/{id}/read` | Authenticated | Mark one as read |
+| `POST /api/notifications/read-all` | Authenticated | Mark all as read |
+
+A vendor's `phone` in discovery responses is its owner's `PhoneNumber` once claimed, falling back
+to the `contactPhone` supplied when it was community-added.
+
+## Admin console
+
+Built directly against `Admin/` (the TanStack Start admin web app in this repo) — every
+interactive element there (verification decisions, category creation, report resolution) is
+backed by a real endpoint, not just the read-only views.
+
+There is only one Admin type — every admin account can perform every admin action
+(`[Authorize(Roles = Roles.Admin)]` is the only gate; no sub-roles or permission tiers).
+
+### Vendor verification queue
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `GET /api/vendors/verification-queue` | Admin | Vendors with `Status = PendingVerification` and a claimant (`UserId` set) — covers both freshly self-registered vendors and claimed community-added listings |
+| `POST /api/vendors/{id}/verify` | Admin | Sets `Status = Verified`, notifies the owner |
+| `POST /api/vendors/{id}/reject-claim` | Admin | Reverts the listing to **unclaimed** (`UserId = null`) rather than suspending it — the claim is what's rejected, not necessarily the business. Notifies the (former) claimant |
+| `POST /api/vendors/{id}/request-info` | Admin | `{ message }` — sends the claimant a notification with no status change |
+| `GET /api/vendors/admin-list` | Admin | Full vendor list for the "Claims & Vendors" admin table — includes suspended/unclaimed listings the public `GET /api/vendors` hides |
+| `POST /api/vendors/{id}/suspend` | Admin | Only valid from `Verified` — sets `Status = Suspended`, notifies the owner |
+| `POST /api/vendors/{id}/unsuspend` | Admin | Only valid from `Suspended` — reverts to `Verified` |
+
+### Categories, reports, dashboard
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `POST /api/categories` | Admin | `{ name }`. `409` on a duplicate name |
+| `POST /api/reports` | Authenticated (any role) | File a report: `{ kind: "Flag" \| "ReviewDispute", title, detail, targetVendorId? or targetReviewId? }` — matches the doc's community-moderation flow |
+| `GET /api/admin/reports` | Admin | All reports, open first, then by priority/recency |
+| `POST /api/admin/reports/{id}/resolve` | Admin | Idempotent — resolving twice is a no-op |
+| `GET /api/admin/stats` | Admin | `{ totalVendors, communityAdded, pendingVerification, activeUsers, reportsOpen }` |
+| `GET /api/admin/activity` | Admin | Recent activity feed. Optional `take` (default 20, max 100). Written by a small set of trigger points (vendor added/claimed/verified, claim rejected, report resolved) — not a full audit log of every write |
+| `GET /api/admin/users` | Admin | Every user with role, active status, join date, vendors added, reviews written. No gamification (points/levels/"Inspector" role) — deliberately deferred, matches the product doc's own MVP scoping |
 
 ## Security notes
 
@@ -91,6 +208,23 @@ All `/api/auth/*` endpoints are rate-limited (10 requests/min/IP).
 - In Development, the confirmation/reset token is written to the console log instead of a real
   email (`ConsoleEmailService`) — swap for Azure Communication Services or SendGrid before
   shipping.
+
+## Seed data
+
+`Data/DbSeeder.cs` runs automatically on every startup (local and Azure) and is idempotent —
+safe to redeploy repeatedly, it only creates what's missing. It seeds:
+
+- The 3 roles (Admin/Vendor/Customer) and the bootstrap Admin (from `AdminBootstrap:*` config)
+- 7 categories matching the frontend's filter list
+- 7 demo vendors and 4 demo customers (password for all: `Demo@Pass2026`), matching the names/
+  businesses used in the customer app's UI mocks (`frontend/mobile/customer/constants/vendor.ts`
+  and `feed.ts`) so real API data lines up with what the screens were designed around
+- 3 demo feed posts referencing those seeded vendors
+- 1 unclaimed community-added vendor ("Ntombi's Braai Stand") demonstrating the add/claim flow
+- 2 demo notifications for one of the seeded customers
+
+All seeded accounts are pre-confirmed (`EmailConfirmed = true`) and skip the email-confirmation
+step, since they're created directly rather than through `/api/auth/register`.
 
 ## Azure deployment
 

@@ -19,29 +19,16 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
-    [HttpPost("register/customer")]
+    // Public route (Customer/Vendor must be self-serve), but creating UserType.Admin still
+    // requires the caller to already be an authenticated Admin - checked here, not by the
+    // route's own authorization, since the route itself can't be anonymous-for-some-bodies.
+    [HttpPost("register")]
     [AllowAnonymous]
-    public async Task<IActionResult> RegisterCustomer(RegisterCustomerRequest request, CancellationToken ct)
+    public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
     {
-        var result = await _authService.RegisterCustomerAsync(request, ct);
-        return FromResult(result);
-    }
+        var callerIsAdmin = User.Identity?.IsAuthenticated == true && User.IsInRole(Roles.Admin);
 
-    [HttpPost("register/vendor")]
-    [AllowAnonymous]
-    public async Task<IActionResult> RegisterVendor(RegisterVendorRequest request, CancellationToken ct)
-    {
-        var result = await _authService.RegisterVendorAsync(request, ct);
-        return FromResult(result);
-    }
-
-    // Only an authenticated Admin can create another Admin - there is no public self-registration
-    // route for this role.
-    [HttpPost("register/admin")]
-    [Authorize(Roles = Roles.Admin)]
-    public async Task<IActionResult> RegisterAdmin(RegisterAdminRequest request, CancellationToken ct)
-    {
-        var result = await _authService.RegisterAdminAsync(request, ct);
+        var result = await _authService.RegisterAsync(request, callerIsAdmin, ct);
         return FromResult(result);
     }
 

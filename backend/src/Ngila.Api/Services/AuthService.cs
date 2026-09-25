@@ -4,7 +4,9 @@ using Ngila.Api.Common;
 using Ngila.Api.Data;
 using Ngila.Api.DTOs.Auth;
 using Ngila.Api.DTOs.Common;
+using Ngila.Api.DTOs.Vendors;
 using Ngila.Api.Models.Entities;
+using Ngila.Api.Models.Enums;
 using Ngila.Api.Services.Interfaces;
 
 namespace Ngila.Api.Services;
@@ -20,6 +22,8 @@ public class AuthService : IAuthService
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
+    private readonly IActivityLogService _activityLog;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -29,6 +33,8 @@ public class AuthService : IAuthService
         ApplicationDbContext context,
         ITokenService tokenService,
         IEmailService emailService,
+        INotificationService notificationService,
+        IActivityLogService activityLog,
         ILogger<AuthService> logger)
     {
         _userManager = userManager;
@@ -37,52 +43,57 @@ public class AuthService : IAuthService
         _context = context;
         _tokenService = tokenService;
         _emailService = emailService;
+        _notificationService = notificationService;
+        _activityLog = activityLog;
         _logger = logger;
     }
 
-    public async Task<ServiceResult<MessageResponse>> RegisterCustomerAsync(RegisterCustomerRequest request, CancellationToken ct = default)
+    public async Task<ServiceResult<MessageResponse>> RegisterAsync(RegisterRequest request, bool callerIsAdmin, CancellationToken ct = default)
     {
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        // The route this hits is reachable anonymously (Customer/Vendor must be publicly
+        // self-serve), so this is the only thing standing between "anyone" and a fresh Admin
+        // account. callerIsAdmin is true only for an authenticated Admin - do not remove without
+        // an equivalent guard.
+        if (request.UserType == UserType.Admin && !callerIsAdmin)
+            return ServiceResult<MessageResponse>.Failure("Only an existing admin can create another admin account.", 403);
 
-        var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, Roles.Customer);
-
-        if (!createResult.Succeeded || createResult.Data is null)
-            return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
-
-        var user = createResult.Data;
-
-        _context.CustomerProfiles.Add(new CustomerProfile { UserId = user.Id });
-        await _context.SaveChangesAsync(ct);
-
-        var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-        await transaction.CommitAsync(ct);
-
-        await _emailService.SendEmailConfirmationAsync(user.Email!, user.Id, confirmationToken, ct);
-
-        return ServiceResult<MessageResponse>.Success(
-            new MessageResponse("Registration successful. Please check your email to confirm your account."), 201);
-    }
-
-    public async Task<ServiceResult<MessageResponse>> RegisterVendorAsync(RegisterVendorRequest request, CancellationToken ct = default)
-    {
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
-
-        var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, Roles.Vendor);
-
-        if (!createResult.Succeeded || createResult.Data is null)
-            return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
-
-        var user = createResult.Data;
-
-        _context.VendorProfiles.Add(new VendorProfile
+        var role = request.UserType switch
         {
-            UserId = user.Id,
-            BusinessName = request.BusinessName,
-            Description = request.BusinessDescription
-        });
-        await _context.SaveChangesAsync(ct);
+            UserType.Customer => Roles.Customer,
+            UserType.Vendor => Roles.Vendor,
+            UserType.Admin => Roles.Admin,
+            _ => throw new ArgumentOutOfRangeException(nameof(request), "Unrecognised user type."),
+        };
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+
+        var createResult = await CreateUserAsync(
+            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password,
+            request.Gender, role);
+
+        if (!createResult.Succeeded || createResult.Data is null)
+            return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
+
+        var user = createResult.Data;
+
+        if (request.UserType == UserType.Customer)
+        {
+            _context.CustomerProfiles.Add(new CustomerProfile { UserId = user.Id });
+            await _context.SaveChangesAsync(ct);
+        }
+        // Vendor: no VendorProfile created here - set up afterwards via PUT /api/vendors/me, or
+        // acquired all at once by claiming an existing unclaimed listing (ClaimVendorAsync).
+
+        if (request.UserType == UserType.Admin)
+        {
+            // Admin accounts are created by a trusted peer, so treat email as pre-confirmed
+            // rather than routing through the public confirmation flow.
+            user.EmailConfirmed = true;
+            await _userManager.UpdateAsync(user);
+            await transaction.CommitAsync(ct);
+
+            return ServiceResult<MessageResponse>.Success(new MessageResponse("Admin account created successfully."), 201);
+        }
 
         var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
         await transaction.CommitAsync(ct);
@@ -93,24 +104,47 @@ public class AuthService : IAuthService
             new MessageResponse("Registration successful. Please check your email to confirm your account."), 201);
     }
 
-    public async Task<ServiceResult<MessageResponse>> RegisterAdminAsync(RegisterAdminRequest request, CancellationToken ct = default)
+    public async Task<ServiceResult<MessageResponse>> ClaimVendorAsync(Guid vendorId, ClaimVendorRequest request, CancellationToken ct = default)
     {
-        // Only reachable via [Authorize(Roles = Roles.Admin)] on the controller action - an existing
-        // admin must vouch for a new one. There is no public admin self-registration endpoint.
+        var vendor = await _context.VendorProfiles.FirstOrDefaultAsync(v => v.Id == vendorId, ct);
+        if (vendor is null)
+            return ServiceResult<MessageResponse>.Failure("Vendor not found.", 404);
+
+        if (vendor.UserId is not null)
+            return ServiceResult<MessageResponse>.Failure("This vendor has already been claimed.", 409);
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+
         var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, Roles.Admin);
+            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Vendor);
 
         if (!createResult.Succeeded || createResult.Data is null)
             return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
 
         var user = createResult.Data;
 
-        // Admin accounts are created by a trusted peer, so treat email as pre-confirmed rather than
-        // routing through the public confirmation flow.
-        user.EmailConfirmed = true;
-        await _userManager.UpdateAsync(user);
+        vendor.UserId = user.Id;
+        await _context.SaveChangesAsync(ct);
 
-        return ServiceResult<MessageResponse>.Success(new MessageResponse("Admin account created successfully."), 201);
+        var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+        await transaction.CommitAsync(ct);
+
+        await _emailService.SendEmailConfirmationAsync(user.Email!, user.Id, confirmationToken, ct);
+
+        if (vendor.AddedByUserId is not null)
+        {
+            await _notificationService.NotifyAsync(
+                vendor.AddedByUserId.Value,
+                "Your suggested vendor was claimed!",
+                $"{vendor.BusinessName}, which you added to Ngila, has been claimed by its owner.",
+                vendor.Id,
+                ct);
+        }
+
+        await _activityLog.LogAsync(user.Id, $"claimed {vendor.BusinessName}", "vendor-claimed", ct);
+
+        return ServiceResult<MessageResponse>.Success(
+            new MessageResponse("Vendor claimed successfully. Please check your email to confirm your account."), 201);
     }
 
     public async Task<ServiceResult<AuthResponse>> LoginAsync(LoginRequest request, string? ipAddress, CancellationToken ct = default)
@@ -285,12 +319,13 @@ public class AuthService : IAuthService
         var roles = await _userManager.GetRolesAsync(user);
 
         return ServiceResult<CurrentUserResponse>.Success(new CurrentUserResponse(
-            user.Id, user.Email!, user.FirstName, user.LastName, user.PhoneNumber,
+            user.Id, user.Email!, user.FirstName, user.LastName, user.PhoneNumber, user.Gender,
             roles.FirstOrDefault() ?? string.Empty, user.EmailConfirmed, user.CreatedAt));
     }
 
     private async Task<ServiceResult<ApplicationUser>> CreateUserAsync(
-        string email, string firstName, string lastName, string? phoneNumber, string password, string role)
+        string email, string firstName, string lastName, string? phoneNumber, string password,
+        Gender? gender, string role)
     {
         var existing = await _userManager.FindByEmailAsync(email);
         if (existing is not null)
@@ -306,6 +341,7 @@ public class AuthService : IAuthService
             FirstName = firstName,
             LastName = lastName,
             PhoneNumber = phoneNumber,
+            Gender = gender,
         };
 
         var createResult = await _userManager.CreateAsync(user, password);

@@ -9,10 +9,12 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Ngila.Api.Common;
 using Ngila.Api.Configuration;
 using Ngila.Api.Data;
 using Ngila.Api.Middleware;
 using Ngila.Api.Models.Entities;
+using Ngila.Api.Models.Enums;
 using Ngila.Api.Services;
 using Ngila.Api.Services.Interfaces;
 
@@ -89,8 +91,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
-
 // ---------- Rate limiting (protects auth endpoints from brute-force / credential stuffing) ----------
 builder.Services.AddRateLimiter(options =>
 {
@@ -102,6 +102,18 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Public read endpoints (vendors/categories/feed) are polled far more often by normal app
+    // usage than auth is, so they get a more generous limit while still capping abuse.
+    options.AddPolicy("public-read", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -126,13 +138,24 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
+builder.Services.AddScoped<IVendorService, VendorService>();
+builder.Services.AddScoped<IFeedService, FeedService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 // ---------- Validation ----------
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // ---------- Controllers / Swagger ----------
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    // Enums (e.g. Gender) are sent/received as readable strings ("Male") rather than raw
+    // numbers - friendlier API contract, and the numeric value would be an implementation
+    // detail clients shouldn't need to hardcode.
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
