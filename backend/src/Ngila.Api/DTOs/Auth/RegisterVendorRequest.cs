@@ -6,6 +6,12 @@ public record RegisterVendorRequest(
     string Email,
     string? PhoneNumber,
     string Password,
-    string ConfirmPassword,
     string BusinessName,
-    string? BusinessDescription);
+    string? BusinessDescription,
+    Guid CategoryId,
+    string LocationDescription,
+    decimal? Latitude,
+    decimal? Longitude,
+    TimeSpan? OpeningTime,
+    TimeSpan? ClosingTime,
+    string? ImageUrl);

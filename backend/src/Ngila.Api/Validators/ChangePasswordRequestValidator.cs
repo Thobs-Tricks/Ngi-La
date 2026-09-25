@@ -9,7 +9,5 @@ public class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRe
     {
         RuleFor(x => x.CurrentPassword).NotEmpty();
         RuleFor(x => x.NewPassword).MustBeAStrongPassword();
-        RuleFor(x => x.ConfirmNewPassword)
-            .Equal(x => x.NewPassword).WithMessage("Passwords do not match.");
     }
 }

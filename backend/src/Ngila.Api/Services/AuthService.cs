@@ -66,6 +66,10 @@ public class AuthService : IAuthService
 
     public async Task<ServiceResult<MessageResponse>> RegisterVendorAsync(RegisterVendorRequest request, CancellationToken ct = default)
     {
+        var categoryExists = await _context.Categories.AnyAsync(c => c.Id == request.CategoryId, ct);
+        if (!categoryExists)
+            return ServiceResult<MessageResponse>.Failure("Selected category does not exist.", 400);
+
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
         var createResult = await CreateUserAsync(
@@ -80,7 +84,14 @@ public class AuthService : IAuthService
         {
             UserId = user.Id,
             BusinessName = request.BusinessName,
-            Description = request.BusinessDescription
+            Description = request.BusinessDescription,
+            CategoryId = request.CategoryId,
+            LocationDescription = request.LocationDescription,
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+            OpeningTime = request.OpeningTime,
+            ClosingTime = request.ClosingTime,
+            ImageUrl = request.ImageUrl
         });
         await _context.SaveChangesAsync(ct);
 

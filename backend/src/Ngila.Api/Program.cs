@@ -105,6 +105,18 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+
+    // Public read endpoints (vendors/categories/feed) are polled far more often by normal app
+    // usage than auth is, so they get a more generous limit while still capping abuse.
+    options.AddPolicy("public-read", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
 
 // ---------- CORS ----------
@@ -126,6 +138,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
+builder.Services.AddScoped<IVendorService, VendorService>();
+builder.Services.AddScoped<IFeedService, FeedService>();
 
 // ---------- Validation ----------
 builder.Services.AddFluentValidationAutoValidation();

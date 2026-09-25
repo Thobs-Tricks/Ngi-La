@@ -10,7 +10,5 @@ public class ResetPasswordRequestValidator : AbstractValidator<ResetPasswordRequ
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Token).NotEmpty();
         RuleFor(x => x.NewPassword).MustBeAStrongPassword();
-        RuleFor(x => x.ConfirmNewPassword)
-            .Equal(x => x.NewPassword).WithMessage("Passwords do not match.");
     }
 }

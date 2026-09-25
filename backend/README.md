@@ -79,7 +79,28 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 | `POST /api/auth/change-password` | Authenticated | Revokes all sessions on success |
 | `GET /api/auth/me` | Authenticated | Current user profile |
 
-All `/api/auth/*` endpoints are rate-limited (10 requests/min/IP).
+All `/api/auth/*` endpoints are rate-limited (10 requests/min/IP). Passwords are sent once —
+there is no `confirmPassword`/`confirmNewPassword` field anywhere in the API; matching the two
+password fields is a client-side concern only.
+
+## Discovery & feed endpoints
+
+Public, read-only, no auth required. Rate-limited more generously than auth (60 requests/min/IP).
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/categories` | List of vendor categories |
+| `GET /api/vendors` | Query params: `lat`, `lng`, `categoryId`, `search` (all optional). Sorted by distance from the given coordinates; defaults to Johannesburg CBD if omitted |
+| `GET /api/vendors/{id}` | Vendor detail. Optional `lat`/`lng` for distance |
+| `GET /api/feed` | Recent community feed posts. Optional `take` (default 20, max 50) |
+
+Only verified-*email* vendors appear in discovery (registered but never confirmed = hidden) and
+suspended vendors are always excluded. `rating`/`reviewsCount` are system-set only — never
+accepted from a vendor's own registration/profile request.
+
+`POST /api/auth/register/vendor` now also requires `categoryId` (see `GET /api/categories`) and
+`locationDescription`, and accepts optional `latitude`, `longitude`, `openingTime`, `closingTime`,
+`imageUrl`.
 
 ## Security notes
 
@@ -91,6 +112,21 @@ All `/api/auth/*` endpoints are rate-limited (10 requests/min/IP).
 - In Development, the confirmation/reset token is written to the console log instead of a real
   email (`ConsoleEmailService`) — swap for Azure Communication Services or SendGrid before
   shipping.
+
+## Seed data
+
+`Data/DbSeeder.cs` runs automatically on every startup (local and Azure) and is idempotent —
+safe to redeploy repeatedly, it only creates what's missing. It seeds:
+
+- The 3 roles (Admin/Vendor/Customer) and the bootstrap Admin (from `AdminBootstrap:*` config)
+- 7 categories matching the frontend's filter list
+- 7 demo vendors and 4 demo customers (password for all: `Demo@Pass2026`), matching the names/
+  businesses used in the customer app's UI mocks (`frontend/mobile/customer/constants/vendor.ts`
+  and `feed.ts`) so real API data lines up with what the screens were designed around
+- 3 demo feed posts referencing those seeded vendors
+
+All seeded accounts are pre-confirmed (`EmailConfirmed = true`) and skip the email-confirmation
+step, since they're created directly rather than through `/api/auth/register/*`.
 
 ## Azure deployment
 

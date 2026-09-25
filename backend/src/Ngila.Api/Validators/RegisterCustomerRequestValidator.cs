@@ -15,7 +15,5 @@ public class RegisterCustomerRequestValidator : AbstractValidator<RegisterCustom
             .When(x => !string.IsNullOrWhiteSpace(x.PhoneNumber))
             .WithMessage("Phone number is not in a valid format.");
         RuleFor(x => x.Password).MustBeAStrongPassword();
-        RuleFor(x => x.ConfirmPassword)
-            .Equal(x => x.Password).WithMessage("Passwords do not match.");
     }
 }
