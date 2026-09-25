@@ -1,6 +1,10 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Ngila.Api.Common;
 using Ngila.Api.Data;
 using Ngila.Api.DTOs.Admin;
+using Ngila.Api.DTOs.Common;
+using Ngila.Api.Models.Entities;
 using Ngila.Api.Models.Enums;
 using Ngila.Api.Services.Interfaces;
 
@@ -9,10 +13,14 @@ namespace Ngila.Api.Services;
 public class AdminService : IAdminService
 {
     private readonly ApplicationDbContext _context;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IActivityLogService _activityLog;
 
-    public AdminService(ApplicationDbContext context)
+    public AdminService(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IActivityLogService activityLog)
     {
         _context = context;
+        _userManager = userManager;
+        _activityLog = activityLog;
     }
 
     public async Task<AdminStatsResponse> GetStatsAsync(CancellationToken ct = default)
@@ -65,5 +73,42 @@ public class AdminService : IAdminService
                 reviewsByUserId.GetValueOrDefault(u.Id, 0)))
             .OrderByDescending(u => u.VendorsAdded + u.ReviewsWritten)
             .ToList();
+    }
+
+    public async Task<ServiceResult<MessageResponse>> ResetUserPasswordAsync(Guid adminUserId, AdminResetPasswordRequest request, CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email);
+        if (user is null)
+            return ServiceResult<MessageResponse>.Failure("No account with that email.", 404);
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await _userManager.ResetPasswordAsync(user, token, request.NewPassword);
+        if (!result.Succeeded)
+            return ServiceResult<MessageResponse>.Failure(string.Join(" ", result.Errors.Select(e => e.Description)), 400);
+
+        // Also confirm the account - there's no real email provider wired up yet, so this is the
+        // only way an Admin can unblock a self-registered user whose confirmation email never
+        // reached them.
+        if (!user.EmailConfirmed)
+        {
+            user.EmailConfirmed = true;
+            await _userManager.UpdateAsync(user);
+        }
+
+        // A password reset invalidates every existing session, same as the self-service reset.
+        var activeTokens = await _context.RefreshTokens
+            .Where(rt => rt.UserId == user.Id && rt.RevokedAt == null && rt.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync(ct);
+        foreach (var refreshToken in activeTokens)
+        {
+            refreshToken.RevokedAt = DateTime.UtcNow;
+            refreshToken.ReasonRevoked = "Password was reset by an admin";
+        }
+        if (activeTokens.Count > 0)
+            await _context.SaveChangesAsync(ct);
+
+        await _activityLog.LogAsync(adminUserId, $"reset the password for {user.Email}", "password-reset-by-admin", ct);
+
+        return ServiceResult<MessageResponse>.Success(new MessageResponse("Password reset. The user can log in with the new password."));
     }
 }

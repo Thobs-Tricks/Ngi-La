@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Ngila.Api.Common;
+using Ngila.Api.DTOs.Admin;
 using Ngila.Api.Services.Interfaces;
 
 namespace Ngila.Api.Controllers;
@@ -44,5 +45,21 @@ public class AdminController : ControllerBase
     {
         var users = await _adminService.GetUsersAsync(ct);
         return Ok(users);
+    }
+
+    /// <summary>
+    /// Support tool: reset a user's password and mark their account confirmed. Currently the
+    /// only way to unblock a self-registered account, since there's no real email provider wired
+    /// up yet (see ConsoleEmailService) - the confirmation/reset emails only ever reach the
+    /// server log.
+    /// </summary>
+    [HttpPost("users/reset-password")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> ResetUserPassword(AdminResetPasswordRequest request, CancellationToken ct)
+    {
+        var result = await _adminService.ResetUserPasswordAsync(User.GetUserId(), request, ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
     }
 }
