@@ -44,6 +44,22 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 
    Generate a secret: `openssl rand -base64 48`
 
+   **Using the shared dev database instead of local SQL Server**: ask a teammate for the
+   `sql-ngila` connection string (Azure Portal → SQL databases → `ngila-db` → Connection
+   strings), then:
+
+   ```bash
+   dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<the connection string they give you>"
+   ```
+
+   This points your local API at the **same live database the deployed API and everyone else's
+   local run use** — convenient for a hackathon, but be aware your local testing reads/writes
+   real data everyone else sees too. Never paste the real connection string into a file that gets
+   committed (appsettings.*.json, this README, a commit message, etc.) — `dotnet user-secrets`
+   keeps it outside the repo entirely. The SQL server firewall is currently open to all IPs
+   (`AllowAllForHackathon`) so this works from anywhere; tighten that again once the DB holds
+   anything worth protecting.
+
    `AdminBootstrap` creates the **first** Admin account automatically on startup (only if no
    Admin exists yet). Every subsequent Admin must be created by an existing Admin via
    `POST /api/auth/register` with `userType: "Admin"` while authenticated as one — see below.
