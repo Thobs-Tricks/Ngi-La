@@ -30,7 +30,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
-        run: npm install
+        # node_modules is (still) committed in this repo with Windows-only native binaries
+        # (rolldown's platform binding), which breaks npm's optional-dependency resolution on
+        # the Linux runner. Wiping it first forces npm to resolve the correct linux-x64 binaries.
+        run: rm -rf node_modules package-lock.json && npm install
 
       - name: Build
         working-directory: ${{ env.APP_DIR }}
