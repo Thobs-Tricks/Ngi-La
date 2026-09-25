@@ -45,45 +45,54 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
-    public async Task<ServiceResult<MessageResponse>> RegisterCustomerAsync(RegisterCustomerRequest request, CancellationToken ct = default)
+    public async Task<ServiceResult<MessageResponse>> RegisterAsync(RegisterRequest request, bool callerIsAdmin, CancellationToken ct = default)
     {
+        // The route this hits is reachable anonymously (Customer/Vendor must be publicly
+        // self-serve), so this is the only thing standing between "anyone" and a fresh Admin
+        // account. Do not remove without replacing it with an equivalent guard.
+        if (request.UserType == UserType.Admin && !callerIsAdmin)
+            return ServiceResult<MessageResponse>.Failure("Only an existing admin can create another admin account.", 403);
+
+        var role = request.UserType switch
+        {
+            UserType.Customer => Roles.Customer,
+            UserType.Vendor => Roles.Vendor,
+            UserType.Admin => Roles.Admin,
+            _ => throw new ArgumentOutOfRangeException(nameof(request), "Unrecognised user type."),
+        };
+
         await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
         var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Customer);
+            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, role);
 
         if (!createResult.Succeeded || createResult.Data is null)
             return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
 
         var user = createResult.Data;
 
-        _context.CustomerProfiles.Add(new CustomerProfile { UserId = user.Id });
-        await _context.SaveChangesAsync(ct);
+        if (request.UserType == UserType.Customer)
+        {
+            _context.CustomerProfiles.Add(new CustomerProfile { UserId = user.Id });
+            await _context.SaveChangesAsync(ct);
+        }
+        // Vendor: no VendorProfile created here - set up afterwards via PUT /api/vendors/me, or
+        // acquired all at once by claiming an existing unclaimed listing (ClaimVendorAsync).
+
+        if (request.UserType == UserType.Admin)
+        {
+            // Admin accounts are created by a trusted peer, so treat email as pre-confirmed
+            // rather than routing through the public confirmation flow.
+            user.EmailConfirmed = true;
+            await _userManager.UpdateAsync(user);
+            await transaction.CommitAsync(ct);
+
+            return ServiceResult<MessageResponse>.Success(new MessageResponse("Admin account created successfully."), 201);
+        }
 
         var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
         await transaction.CommitAsync(ct);
 
-        await _emailService.SendEmailConfirmationAsync(user.Email!, user.Id, confirmationToken, ct);
-
-        return ServiceResult<MessageResponse>.Success(
-            new MessageResponse("Registration successful. Please check your email to confirm your account."), 201);
-    }
-
-    public async Task<ServiceResult<MessageResponse>> RegisterVendorAsync(RegisterVendorRequest request, CancellationToken ct = default)
-    {
-        // Personal account only - no VendorProfile is created here. The vendor sets up their
-        // shop (business name, category, location, hours) afterwards via PUT /api/vendors/me,
-        // once they're logged in. Claiming an existing community-added listing is the other way
-        // a Vendor-role account gets a profile - see ClaimVendorAsync.
-        var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Vendor);
-
-        if (!createResult.Succeeded || createResult.Data is null)
-            return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
-
-        var user = createResult.Data;
-
-        var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
         await _emailService.SendEmailConfirmationAsync(user.Email!, user.Id, confirmationToken, ct);
 
         return ServiceResult<MessageResponse>.Success(
@@ -129,26 +138,6 @@ public class AuthService : IAuthService
 
         return ServiceResult<MessageResponse>.Success(
             new MessageResponse("Vendor claimed successfully. Please check your email to confirm your account."), 201);
-    }
-
-    public async Task<ServiceResult<MessageResponse>> RegisterAdminAsync(RegisterAdminRequest request, CancellationToken ct = default)
-    {
-        // Only reachable via [Authorize(Roles = Roles.Admin)] on the controller action - an existing
-        // admin must vouch for a new one. There is no public admin self-registration endpoint.
-        var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Admin);
-
-        if (!createResult.Succeeded || createResult.Data is null)
-            return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
-
-        var user = createResult.Data;
-
-        // Admin accounts are created by a trusted peer, so treat email as pre-confirmed rather than
-        // routing through the public confirmation flow.
-        user.EmailConfirmed = true;
-        await _userManager.UpdateAsync(user);
-
-        return ServiceResult<MessageResponse>.Success(new MessageResponse("Admin account created successfully."), 201);
     }
 
     public async Task<ServiceResult<AuthResponse>> LoginAsync(LoginRequest request, string? ipAddress, CancellationToken ct = default)

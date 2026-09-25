@@ -240,10 +240,10 @@ index on `UserId`) or an **unclaimed, community-added** listing (`UserId IS NULL
 mechanic behind Ngila's "add a vendor nobody's claimed yet" feature.
 
 Note that a `Vendor`-role `AspNetUsers` row can also exist with **zero** matching `VendorProfiles`
-rows: `POST /api/auth/register/vendor` only creates the account (personal details), not a shop
-profile - that's set up separately via `PUT /api/vendors/me` once logged in. The alternative path,
-`POST /api/vendors/{id}/claim`, creates the account *and* attaches an existing unclaimed
-`VendorProfile` in one step, skipping that gap entirely.
+rows: `POST /api/auth/register` (`userType: "Vendor"`) only creates the account (personal
+details), not a shop profile - that's set up separately via `PUT /api/vendors/me` once logged in.
+The alternative path, `POST /api/vendors/{id}/claim`, creates the account *and* attaches an
+existing unclaimed `VendorProfile` in one step, skipping that gap entirely.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -253,7 +253,7 @@ profile - that's set up separately via `PUT /api/vendors/me` once logged in. The
 | `BusinessName` | `nvarchar(200)` NOT NULL | |
 | `Description` | `nvarchar(1000)` NULL | |
 | `Status` | `int` NOT NULL | See [`VendorStatus`](#vendorstatus-enum) below |
-| `CategoryId` | `uniqueidentifier` NULL, FK → `Categories.Id`, `SET NULL` on delete | Nullable at storage level; required by both `/api/auth/register/vendor` and `POST /api/vendors` today |
+| `CategoryId` | `uniqueidentifier` NULL, FK → `Categories.Id`, `SET NULL` on delete | Nullable at storage level; required by both `PUT /api/vendors/me` and `POST /api/vendors` today |
 | `LocationDescription` | `nvarchar(300)` NULL | Free text (e.g. "next to the taxi rank") — many informal vendors have no formal address |
 | `Latitude` / `Longitude` | `decimal(9,6)` / `decimal(10,6)` NULL | Optional; vendors without coordinates get `distance: 0` in discovery responses. Exposed raw in `GET /api/vendors/{id}` so a client can build a maps deep link |
 | `OpeningTime` / `ClosingTime` | `time` NULL | Used to compute `isOpen` server-side (Africa/Johannesburg local time) — never stored as a boolean directly |
@@ -356,6 +356,18 @@ vary independently. Extend this enum only if a genuinely new *verification* stat
 
 Nullable and optional everywhere it's collected (every registration DTO). Serialized as a string
 over the API (`"Male"`, not `1`) via a global `JsonStringEnumConverter` in `Program.cs`.
+
+### `UserType` (request-only, not a stored column)
+
+| Value | Meaning |
+|---|---|
+| `0` — `Customer` | |
+| `1` — `Vendor` | |
+| `2` — `Admin` | |
+
+Picks which of the three account types `POST /api/auth/register` creates — it's not persisted as
+a column anywhere; the choice is realized as an `AspNetRoles`/`AspNetUserRoles` assignment (and,
+for `Customer`, a `CustomerProfiles` row) once the account is created. See `AuthService.RegisterAsync`.
 
 ## Indexes
 

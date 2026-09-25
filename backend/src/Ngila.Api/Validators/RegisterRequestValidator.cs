@@ -1,12 +1,14 @@
 using FluentValidation;
 using Ngila.Api.DTOs.Auth;
+using Ngila.Api.Models.Enums;
 
 namespace Ngila.Api.Validators;
 
-public class RegisterCustomerRequestValidator : AbstractValidator<RegisterCustomerRequest>
+public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 {
-    public RegisterCustomerRequestValidator()
+    public RegisterRequestValidator()
     {
+        RuleFor(x => x.UserType).IsInEnum();
         RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(256);
@@ -15,5 +17,6 @@ public class RegisterCustomerRequestValidator : AbstractValidator<RegisterCustom
             .When(x => !string.IsNullOrWhiteSpace(x.PhoneNumber))
             .WithMessage("Phone number is not in a valid format.");
         RuleFor(x => x.Password).MustBeAStrongPassword();
+        RuleFor(x => x.Gender).IsInEnum().When(x => x.Gender.HasValue);
     }
 }

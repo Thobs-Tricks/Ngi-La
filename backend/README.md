@@ -46,7 +46,7 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 
    `AdminBootstrap` creates the **first** Admin account automatically on startup (only if no
    Admin exists yet). Every subsequent Admin must be created by an existing Admin via
-   `POST /api/auth/register/admin` — there's no public admin self-registration route.
+   `POST /api/auth/register` with `userType: "Admin"` while authenticated as one — see below.
 
 3. **Apply migrations**:
 
@@ -67,9 +67,7 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
 
 | Endpoint | Auth | Notes |
 |---|---|---|
-| `POST /api/auth/register/customer` | Public | Creates Customer + profile, sends email confirmation |
-| `POST /api/auth/register/vendor` | Public | Personal details only (name, phone, email, password, optional `gender`) — no shop info. Sends email confirmation |
-| `POST /api/auth/register/admin` | Admin only | Existing admin vouches for a new one |
+| `POST /api/auth/register` | Public\* | One endpoint for all three account types — see below |
 | `POST /api/auth/login` | Public | Returns access token (15 min) + refresh token (7 days) |
 | `POST /api/auth/refresh` | Public | Rotates refresh token; reuse of a revoked token revokes **all** sessions |
 | `POST /api/auth/revoke` | Public | Logout — revokes a specific refresh token |
@@ -83,8 +81,36 @@ All `/api/auth/*` endpoints are rate-limited (10 requests/min/IP). Passwords are
 there is no `confirmPassword`/`confirmNewPassword` field anywhere in the API; matching the two
 password fields is a client-side concern only.
 
-Enums (`gender`, and any future ones) are sent/received as readable strings (`"Male"`, not `1`) —
-every registration DTO accepts an optional `gender: "Female" | "Male" | "Other"`.
+Enums (`userType`, `gender`, and any future ones) are sent/received as readable strings
+(`"Vendor"`, not `1`) — set globally via `JsonStringEnumConverter` in `Program.cs`.
+
+### `POST /api/auth/register`
+
+One shape for all three account types:
+
+```json
+{
+  "userType": "Customer" | "Vendor" | "Admin",
+  "firstName": "...",
+  "lastName": "...",
+  "email": "...",
+  "phoneNumber": "...",   // optional
+  "password": "...",
+  "gender": "Female" | "Male" | "Other"   // optional
+}
+```
+
+\* The route itself is anonymous-reachable (Customer/Vendor must be publicly self-serve), but
+`userType: "Admin"` is rejected with `403` unless the caller already has a valid Admin session —
+checked inside the handler (`AuthService.RegisterAsync`), since the route can't declare
+`[Authorize]` for only some request bodies. **Don't remove that check without replacing it** —
+it's the only thing stopping anonymous self-service Admin creation now that Customer, Vendor and
+Admin share one endpoint.
+
+Side effects differ by type, same as before the endpoints were merged:
+- **Customer** — creates a `CustomerProfile` row, sends confirmation email
+- **Vendor** — no profile created (set up separately via `PUT /api/vendors/me`), sends confirmation email
+- **Admin** — email pre-confirmed (trusted peer created it), no confirmation email sent
 
 ## Discovery & feed endpoints
 
@@ -106,7 +132,7 @@ never accepted from a vendor's own registration/profile request.
 
 ## Vendor onboarding: two ways to end up with a shop profile
 
-Registering a Vendor account (`POST /api/auth/register/vendor`) creates a bare account with no
+Registering a Vendor account (`POST /api/auth/register` with `userType: "Vendor"`) creates a bare account with no
 shop profile yet — the vendor app's "MySpaza" screen is where that actually gets set up. There
 are two independent paths to owning a `VendorProfile`:
 
