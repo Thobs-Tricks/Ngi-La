@@ -10,6 +10,7 @@ import AppStatusBar from '../../components/AppStatusBar';
 import TextField from '../../components/TextField';
 import PrimaryButton from '../../components/PrimaryButton';
 import PromoPhotoGrid from '../../components/PromoPhotoGrid';
+import TradingHoursEditor, { DEFAULT_TRADING_HOURS, DayHours } from '../../components/TradingHoursEditor';
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../styles/theme';
 import { getCategories } from '../../api/categories';
@@ -43,6 +44,7 @@ export default function MySpazaScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const [tradingHours, setTradingHours] = useState<DayHours[]>(DEFAULT_TRADING_HOURS);
   const [promoPhotos, setPromoPhotos] = useState<string[]>([]);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoSaved, setPromoSaved] = useState(false);
@@ -250,18 +252,30 @@ export default function MySpazaScreen() {
           shows off your spaza.
         </Text>
 
-        <PromoPhotoGrid photos={promoPhotos} onAdd={pickPromoPhoto} onRemove={removePromoPhoto} />
+        <View className="gap-3 rounded-2xl border border-border bg-card p-4">
+          <PromoPhotoGrid photos={promoPhotos} onAdd={pickPromoPhoto} onRemove={removePromoPhoto} />
 
-        {!!promoError && <Text className="mt-3 text-sm text-destructive">{promoError}</Text>}
-        {promoSaved && !promoError && (
-          <Text className="mt-3 text-sm font-medium text-verified">Promo photos saved.</Text>
-        )}
+          {!!promoError && <Text className="text-sm text-destructive">{promoError}</Text>}
 
-        <View className="mb-2 mt-4">
-          <PrimaryButton label="Save Promo Photos" onPress={handleSavePromo} />
+          <View className="flex-row items-center justify-end gap-3">
+            {promoSaved && !promoError && (
+              <Text className="text-xs font-medium text-verified">Saved</Text>
+            )}
+            <Pressable onPress={handleSavePromo} className="rounded-full bg-primary px-4 py-2">
+              <Text className="text-xs font-semibold text-primary-foreground">Save Promo Photos</Text>
+            </Pressable>
+          </View>
         </View>
 
-        <View className="mb-8 mt-2">
+        <Text className="mb-2 mt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Trading Hours
+        </Text>
+        <Text className="mb-3 text-sm text-muted-foreground">
+          Let customers know when you're open. Toggle a day off if you don't trade then.
+        </Text>
+        <TradingHoursEditor hours={tradingHours} onChange={setTradingHours} />
+
+        <View className="mb-8 mt-8">
           <PrimaryButton label="Edit Spaza Details" onPress={() => setSaved(false)} variant="outline" />
         </View>
       </ScreenContainer>
