@@ -244,12 +244,16 @@ public static class DbSeeder
         var thabo = await context.Users.FirstOrDefaultAsync(u => u.Email == "thabo.molefe@ngila.demo");
         var nomusa = await context.Users.FirstOrDefaultAsync(u => u.Email == "nomusa.khumalo@ngila.demo");
         var sipho = await context.Users.FirstOrDefaultAsync(u => u.Email == "sipho.nkosi@ngila.demo");
+        var naledi = await context.Users.FirstOrDefaultAsync(u => u.Email == "naledi.dube@ngila.demo");
 
         var auntieJoyce = await context.VendorProfiles.FirstOrDefaultAsync(v => v.BusinessName == "Auntie Joyce Vetkoek");
         var kingsCut = await context.VendorProfiles.FirstOrDefaultAsync(v => v.BusinessName == "King's Cut Barber");
         var siphoProduce = await context.VendorProfiles.FirstOrDefaultAsync(v => v.BusinessName == "Sipho Fresh Produce");
+        var sparkleCarWash = await context.VendorProfiles.FirstOrDefaultAsync(v => v.BusinessName == "Sparkle Mobile Car Wash");
+        var selloRepairs = await context.VendorProfiles.FirstOrDefaultAsync(v => v.BusinessName == "Sello Shoe Repairs");
 
-        if (thabo is null || nomusa is null || sipho is null || auntieJoyce is null || kingsCut is null || siphoProduce is null)
+        if (thabo is null || nomusa is null || sipho is null || naledi is null
+            || auntieJoyce is null || kingsCut is null || siphoProduce is null || sparkleCarWash is null || selloRepairs is null)
         {
             logger.LogWarning("Skipped feed post seeding - one or more referenced demo accounts/vendors were not found.");
             return;
@@ -257,6 +261,8 @@ public static class DbSeeder
 
         var now = DateTime.UtcNow;
 
+        // Reuses the same Unsplash photos assigned to each vendor in SeedDemoVendorsAndCustomersAsync,
+        // so a post's photos visually match the stall it's about.
         context.FeedPosts.AddRange(
             new FeedPost
             {
@@ -267,6 +273,10 @@ public static class DbSeeder
                 LikesCount = 24,
                 CommentsCount = 5,
                 CreatedAt = now.AddMinutes(-15),
+                Photos = new List<FeedPostPhoto>
+                {
+                    new() { Url = "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80", SortOrder = 0 },
+                },
             },
             new FeedPost
             {
@@ -277,6 +287,10 @@ public static class DbSeeder
                 LikesCount = 42,
                 CommentsCount = 8,
                 CreatedAt = now.AddHours(-2),
+                Photos = new List<FeedPostPhoto>
+                {
+                    new() { Url = "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80", SortOrder = 0 },
+                },
             },
             new FeedPost
             {
@@ -287,10 +301,44 @@ public static class DbSeeder
                 LikesCount = 67,
                 CommentsCount = 12,
                 CreatedAt = now.AddHours(-5),
+                Photos = new List<FeedPostPhoto>
+                {
+                    new() { Url = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80", SortOrder = 0 },
+                    new() { Url = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80", SortOrder = 1 },
+                },
+            },
+            new FeedPost
+            {
+                AuthorUserId = naledi.Id,
+                AuthorDisplayRole = "Community Scout",
+                Content = "Got my takkies looking brand new again 👟",
+                VendorId = selloRepairs.Id,
+                LikesCount = 13,
+                CommentsCount = 2,
+                CreatedAt = now.AddHours(-9),
+                Photos = new List<FeedPostPhoto>
+                {
+                    new() { Url = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80", SortOrder = 0 },
+                },
+            },
+            new FeedPost
+            {
+                AuthorUserId = nomusa.Id,
+                AuthorDisplayRole = "Local Explorer",
+                Content = "Booked a mobile wash before work, car came out spotless ✨",
+                VendorId = sparkleCarWash.Id,
+                LikesCount = 19,
+                CommentsCount = 3,
+                CreatedAt = now.AddHours(-18),
+                Photos = new List<FeedPostPhoto>
+                {
+                    new() { Url = "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=800&q=80", SortOrder = 0 },
+                    new() { Url = "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=400&q=80", SortOrder = 1 },
+                },
             });
 
         await context.SaveChangesAsync();
-        logger.LogInformation("Seeded 3 demo feed posts.");
+        logger.LogInformation("Seeded 5 demo feed posts.");
     }
 
     // Demonstrates the flagship "community adds a vendor Ngila doesn't know about yet" flow -
