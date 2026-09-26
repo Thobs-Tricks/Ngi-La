@@ -18,7 +18,6 @@ const inspect: NavItem[] = [
 const insight: NavItem[] = [
   { to: "/users", label: "Users & Contributors" },
   { to: "/admins", label: "Admins" },
-  { to: "/profile", label: "Profile" },
   { to: "/settings", label: "Settings" },
 ];
 
@@ -119,20 +118,27 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <NavLink key={item.to} item={item} active={path === item.to} badge={undefined} />
           ))}
 
-          <button
-            onClick={() => void logout()}
-            className="mt-auto flex items-center gap-2.5 rounded-lg bg-ink/5 px-3 py-2.5 text-left transition hover:bg-ink/10"
-          >
-            <div className="grid size-8 place-items-center rounded-full bg-ember/20 font-display text-xs font-semibold text-ember">
-              {initials}
-            </div>
-            <div className="min-w-0 leading-tight">
-              <p className="truncate text-[13px] font-medium">{user?.firstName} {user?.lastName}</p>
-              <p className="font-mono text-[10px] text-mute">
-                Admin · Sign out
-              </p>
-            </div>
-          </button>
+          <div className="mt-auto space-y-2">
+            <Link
+              to="/profile"
+              className="flex items-center gap-2.5 rounded-lg bg-ink/5 px-3 py-2.5 text-left transition hover:bg-ink/10"
+            >
+              <div className="grid size-8 place-items-center rounded-full bg-ember/20 font-display text-xs font-semibold text-ember">
+                {initials}
+              </div>
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-[13px] font-medium">{user?.firstName} {user?.lastName}</p>
+                <p className="font-mono text-[10px] text-mute">Admin · View profile</p>
+              </div>
+            </Link>
+
+            <button
+              onClick={() => void logout()}
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-left text-[12px] font-medium text-ink transition hover:bg-ink/5"
+            >
+              Sign out
+            </button>
+          </div>
         </aside>
 
         <main className="min-w-0 flex-1 space-y-6 px-4 py-6 md:px-8">
@@ -155,9 +161,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 {stats.pendingVerification}
               </div>
             ) : null}
-            <div className="grid size-9 place-items-center rounded-full bg-ink font-display text-xs font-semibold text-paper">
+            <Link
+              to="/profile"
+              className="grid size-9 place-items-center rounded-full bg-ink font-display text-xs font-semibold text-paper transition hover:opacity-90"
+              aria-label="Open profile"
+            >
               {initials}
-            </div>
+            </Link>
           </header>
 
           <div className="md:hidden">

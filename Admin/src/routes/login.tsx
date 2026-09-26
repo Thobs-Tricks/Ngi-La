@@ -52,9 +52,11 @@ function LoginPage() {
         <div className="grid min-h-[720px] lg:grid-cols-[1.05fr_0.95fr]">
           <div className="relative hidden overflow-hidden border-r border-line bg-ink p-8 text-paper lg:flex lg:flex-col lg:justify-between">
             <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-xl bg-paper font-display text-base font-bold text-ink">
-                N
-              </div>
+              <img
+                src="/ngila-logo.png"
+                alt="Ngila logo"
+                className="h-10 w-10 rounded-xl object-cover shadow-sm ring-1 ring-white/15"
+              />
               <div>
                 <div className="font-display text-[20px] font-bold tracking-[0.12em]">NGILA</div>
                 <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-paper/70">

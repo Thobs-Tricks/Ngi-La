@@ -11,6 +11,7 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUserProfile: (updates: Partial<Pick<CurrentUser, "firstName" | "lastName" | "email" | "phoneNumber" | "gender">>) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -68,8 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateUserProfile = useCallback((updates: Partial<Pick<CurrentUser, "firstName" | "lastName" | "email" | "phoneNumber" | "gender">>) => {
+    setUser((current) => (current ? { ...current, ...updates } : current));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ status, user, login, logout, refreshUser: loadUser }}>
+    <AuthContext.Provider value={{ status, user, login, logout, refreshUser: loadUser, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );
