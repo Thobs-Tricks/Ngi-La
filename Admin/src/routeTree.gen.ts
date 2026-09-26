@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminsRouteImport } from './routes/admins'
 import { Route as CategoriesRouteImport } from './routes/categories'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MapRouteImport } from './routes/map'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -39,6 +40,11 @@ const CategoriesRoute = CategoriesRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapRoute = MapRouteImport.update({
+  id: '/map',
+  path: '/map',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/admins': typeof AdminsRoute
   '/categories': typeof CategoriesRoute
   '/login': typeof LoginRoute
+  '/map': typeof MapRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/admins': typeof AdminsRoute
   '/categories': typeof CategoriesRoute
   '/login': typeof LoginRoute
+  '/map': typeof MapRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/admins': typeof AdminsRoute
   '/categories': typeof CategoriesRoute
   '/login': typeof LoginRoute
+  '/map': typeof MapRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/admins'
     | '/categories'
     | '/login'
+    | '/map'
     | '/profile'
     | '/reset-password'
     | '/settings'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/admins'
     | '/categories'
     | '/login'
+    | '/map'
     | '/profile'
     | '/reset-password'
     | '/settings'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/admins'
     | '/categories'
     | '/login'
+    | '/map'
     | '/profile'
     | '/reset-password'
     | '/settings'
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   AdminsRoute: typeof AdminsRoute
   CategoriesRoute: typeof CategoriesRoute
   LoginRoute: typeof LoginRoute
+  MapRoute: typeof MapRoute
   ProfileRoute: typeof ProfileRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/map': {
+      id: '/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof MapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -260,6 +280,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminsRoute: AdminsRoute,
   CategoriesRoute: CategoriesRoute,
   LoginRoute: LoginRoute,
+  MapRoute: MapRoute,
   ProfileRoute: ProfileRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,

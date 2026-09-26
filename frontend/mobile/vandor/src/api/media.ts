@@ -12,7 +12,16 @@ interface UploadResponse {
 export async function uploadImage(uri: string, accessToken: string): Promise<string> {
   const filename = uri.split('/').pop() || `photo-${Date.now()}.jpg`;
   const extension = filename.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const mimeType = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : extension === 'gif' ? 'image/gif' : 'image/jpeg';
+  // Falls back to jpeg for anything unrecognised (including a content:// URI with no extension
+  // at all) - the API now accepts by Content-Type too and transcodes every upload to jpg
+  // server-side, so this only needs to be a reasonable guess, not exact.
+  const mimeType =
+    extension === 'png' ? 'image/png'
+    : extension === 'webp' ? 'image/webp'
+    : extension === 'gif' ? 'image/gif'
+    : extension === 'heic' ? 'image/heic'
+    : extension === 'heif' ? 'image/heif'
+    : 'image/jpeg';
 
   const form = new FormData();
   // React Native's fetch accepts this {uri, name, type} shape for a file part - it is not a

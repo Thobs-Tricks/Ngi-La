@@ -5,12 +5,13 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { fetchStats } from "@/lib/endpoints";
 
-type NavItem = { to: "/" | "/verification" | "/vendors" | "/categories" | "/users" | "/admins" | "/profile" | "/settings"; label: string; badgeKey?: "verification" };
+type NavItem = { to: "/" | "/verification" | "/vendors" | "/map" | "/categories" | "/users" | "/admins" | "/profile" | "/settings"; label: string; badgeKey?: "verification" };
 
 const inspect: NavItem[] = [
   { to: "/", label: "Overview" },
   { to: "/verification", label: "Verification", badgeKey: "verification" },
   { to: "/vendors", label: "Vendors" },
+  { to: "/map", label: "Map" },
   { to: "/categories", label: "Categories" },
 ];
 

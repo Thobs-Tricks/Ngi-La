@@ -15,8 +15,17 @@ public class MediaService : IMediaService
 {
     private const long MaxImageBytes = 10 * 1024 * 1024; // 10 MB
 
+    // .heic/.heif included because it's the default capture format on iPhones - rejecting it
+    // outright silently broke every upload from an iOS photo library picker that hadn't been
+    // re-encoded to jpeg first.
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
-        { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+        { ".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif" };
+
+    // Some Android content:// picker URIs have no filename extension at all - the client always
+    // sends a best-guess Content-Type on the multipart part even then, so this is the fallback
+    // that keeps those uploads from being rejected just because the extension check found nothing.
+    private static readonly HashSet<string> ImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        { "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif" };
 
     private readonly CloudinarySettings _settings;
     private readonly ILogger<MediaService> _logger;
@@ -36,9 +45,11 @@ public class MediaService : IMediaService
             return ServiceResult<MediaUploadResponse>.Failure("File is empty.", 400);
 
         var extension = Path.GetExtension(file.FileName);
-        if (!ImageExtensions.Contains(extension))
+        var isRecognisedExtension = !string.IsNullOrEmpty(extension) && ImageExtensions.Contains(extension);
+        var isRecognisedContentType = !string.IsNullOrEmpty(file.ContentType) && ImageContentTypes.Contains(file.ContentType);
+        if (!isRecognisedExtension && !isRecognisedContentType)
             return ServiceResult<MediaUploadResponse>.Failure(
-                "Unsupported file type. Allowed: jpg, jpeg, png, webp, gif.", 400);
+                "Unsupported file type. Allowed: jpg, jpeg, png, webp, gif, heic, heif.", 400);
 
         if (file.Length > MaxImageBytes)
             return ServiceResult<MediaUploadResponse>.Failure(
@@ -53,6 +64,10 @@ public class MediaService : IMediaService
             {
                 File = new FileDescription(file.FileName, stream),
                 Folder = "ngila",
+                // Forces the delivered URL to always be a jpg regardless of the source format -
+                // HEIC in particular (the iPhone default) doesn't render in React Native's Image
+                // component or most browsers without this.
+                Format = "jpg",
             }, ct);
 
             if (result.Error is not null)
