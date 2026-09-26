@@ -9,7 +9,7 @@ import type {
   CurrentUser,
   EmailSettings,
   Gender,
-  Report,
+  PlatformStats,
   UserType,
   VerificationQueueItem,
 } from "./types";
@@ -70,6 +70,18 @@ export function resetPassword(email: string, token: string, newPassword: string)
   });
 }
 
+export function changePassword(currentPassword: string, newPassword: string) {
+  return apiRequest<{ message: string }>("/api/auth/change-password", {
+    method: "POST",
+    body: { currentPassword, newPassword },
+  });
+}
+
+// Public - no admin session required. Used on the login screen.
+export function fetchPlatformStats() {
+  return apiRequest<PlatformStats>("/api/stats", { auth: false });
+}
+
 // ---------- Dashboard ----------
 
 export function fetchStats() {
@@ -82,6 +94,14 @@ export function fetchActivity(take = 20) {
 
 export function fetchAdminUsers() {
   return apiRequest<AdminUser[]>("/api/admin/users");
+}
+
+export function suspendUser(id: string) {
+  return apiRequest<AdminUser>(`/api/admin/users/${id}/suspend`, { method: "POST" });
+}
+
+export function unsuspendUser(id: string) {
+  return apiRequest<AdminUser>(`/api/admin/users/${id}/unsuspend`, { method: "POST" });
 }
 
 // ---------- Vendors ----------
@@ -127,16 +147,6 @@ export function fetchCategories() {
 
 export function createCategory(name: string) {
   return apiRequest<Category>("/api/categories", { method: "POST", body: { name } });
-}
-
-// ---------- Reports ----------
-
-export function fetchReports() {
-  return apiRequest<Report[]>("/api/admin/reports");
-}
-
-export function resolveReport(id: string) {
-  return apiRequest<Report>(`/api/admin/reports/${id}/resolve`, { method: "POST" });
 }
 
 // ---------- Email settings ----------

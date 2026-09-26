@@ -20,13 +20,11 @@ public class VendorsController : ControllerBase
 
     private readonly IVendorService _vendorService;
     private readonly IReviewService _reviewService;
-    private readonly IAuthService _authService;
 
-    public VendorsController(IVendorService vendorService, IReviewService reviewService, IAuthService authService)
+    public VendorsController(IVendorService vendorService, IReviewService reviewService)
     {
         _vendorService = vendorService;
         _reviewService = reviewService;
-        _authService = authService;
     }
 
     /// <summary>
@@ -78,7 +76,8 @@ public class VendorsController : ControllerBase
 
     /// <summary>
     /// Creates the calling vendor's shop profile if they don't have one yet, or updates it if
-    /// they do - what "MySpaza" setup/editing calls.
+    /// they do - business details only. Trading hours and photos are saved separately via
+    /// PUT /me/trading-hours and PUT /me/photos.
     /// </summary>
     [HttpPut("me")]
     [Authorize(Roles = Roles.Vendor)]
@@ -91,34 +90,28 @@ public class VendorsController : ControllerBase
     }
 
     /// <summary>
-    /// Community-add a vendor that isn't on Ngila yet. Starts unclaimed until the real
-    /// business claims it via POST /api/vendors/{id}/claim.
+    /// Replaces the calling vendor's weekly trading hours. Requires the profile from PUT /me to
+    /// already exist.
     /// </summary>
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> AddVendor(AddVendorRequest request, CancellationToken ct)
+    [HttpPut("me/trading-hours")]
+    [Authorize(Roles = Roles.Vendor)]
+    public async Task<IActionResult> UpdateMyTradingHours(UpdateVendorTradingHoursRequest request, CancellationToken ct)
     {
-        try
-        {
-            var vendor = await _vendorService.AddVendorAsync(User.GetUserId(), request, ct);
-            return CreatedAtAction(nameof(GetVendor), new { id = vendor.Id }, vendor);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Problem(title: ex.Message, statusCode: 400);
-        }
+        var result = await _vendorService.UpdateOwnTradingHoursAsync(User.GetUserId(), request, ct);
+        return result.Succeeded
+            ? StatusCode(result.StatusCode, result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
     }
 
     /// <summary>
-    /// Claims an unclaimed (community-added) vendor listing by creating the owner's account
-    /// and attaching it in one step.
+    /// Replaces the calling vendor's gallery photos (max 5). Requires the profile from PUT /me
+    /// to already exist.
     /// </summary>
-    [HttpPost("{id:guid}/claim")]
-    [AllowAnonymous]
-    [EnableRateLimiting("auth")]
-    public async Task<IActionResult> ClaimVendor(Guid id, ClaimVendorRequest request, CancellationToken ct)
+    [HttpPut("me/photos")]
+    [Authorize(Roles = Roles.Vendor)]
+    public async Task<IActionResult> UpdateMyPhotos(UpdateVendorPhotosRequest request, CancellationToken ct)
     {
-        var result = await _authService.ClaimVendorAsync(id, request, ct);
+        var result = await _vendorService.UpdateOwnPhotosAsync(User.GetUserId(), request, ct);
         return result.Succeeded
             ? StatusCode(result.StatusCode, result.Data)
             : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });

@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { PageHead, Panel } from "@/components/admin/ui";
-import { fetchAdminUsers } from "@/lib/endpoints";
+import { GhostButton, PageHead, Panel } from "@/components/admin/ui";
+import { fetchAdminUsers, suspendUser, unsuspendUser } from "@/lib/endpoints";
 import { useAuth } from "@/lib/auth";
+import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/users")({
@@ -26,11 +28,26 @@ const roleTone: Record<string, string> = {
 
 function Users() {
   const { status } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: fetchAdminUsers,
     enabled: status === "authenticated",
+  });
+
+  const onError = (err: unknown) => toast.error(err instanceof ApiError ? err.message : "That didn't work.");
+  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+
+  const suspendMutation = useMutation({
+    mutationFn: suspendUser,
+    onSuccess: () => { toast.success("Customer suspended."); invalidate(); },
+    onError,
+  });
+  const unsuspendMutation = useMutation({
+    mutationFn: unsuspendUser,
+    onSuccess: () => { toast.success("Customer reinstated."); invalidate(); },
+    onError,
   });
 
   const list = users ?? [];
@@ -63,7 +80,7 @@ function Users() {
         <table className="w-full min-w-[680px] text-left text-[13px]">
           <thead>
             <tr className="label-mono">
-              {["Member", "Role", "Vendors added", "Reviews", "Joined", "Status"].map((h) => (
+              {["Member", "Role", "Vendors added", "Reviews", "Joined", "Status", "Actions"].map((h) => (
                 <th key={h} className="p-3 font-normal">{h}</th>
               ))}
             </tr>
@@ -77,6 +94,26 @@ function Users() {
                 <td className="p-3 font-mono">{m.reviewsWritten}</td>
                 <td className="p-3 font-mono text-mute">{m.joined}</td>
                 <td className="p-3"><span className={cn("font-mono text-[11px]", m.isActive ? "text-moss" : "text-clay")}>● {m.isActive ? "Active" : "Suspended"}</span></td>
+                <td className="p-3">
+                  {m.role === "Customer" ? (
+                    m.isActive ? (
+                      <GhostButton
+                        className="text-clay"
+                        disabled={suspendMutation.isPending}
+                        onClick={() => suspendMutation.mutate(m.id)}
+                      >
+                        Suspend
+                      </GhostButton>
+                    ) : (
+                      <GhostButton
+                        disabled={unsuspendMutation.isPending}
+                        onClick={() => unsuspendMutation.mutate(m.id)}
+                      >
+                        Reinstate
+                      </GhostButton>
+                    )
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>

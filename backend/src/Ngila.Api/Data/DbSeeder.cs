@@ -29,7 +29,6 @@ public static class DbSeeder
         var categories = await SeedCategoriesAsync(context, logger);
         await SeedDemoVendorsAndCustomersAsync(context, userManager, categories, logger);
         await SeedFeedPostsAsync(context, logger);
-        await SeedCommunityAddedVendorAsync(context, categories, logger);
         await SeedNotificationsAsync(context, logger);
     }
 
@@ -338,40 +337,6 @@ public static class DbSeeder
 
         await context.SaveChangesAsync();
         logger.LogInformation("Seeded 5 demo feed posts.");
-    }
-
-    // Demonstrates the flagship "community adds a vendor Ngila doesn't know about yet" flow -
-    // an unclaimed listing (UserId null) sitting alongside the claimed demo vendors above.
-    private static async Task SeedCommunityAddedVendorAsync(
-        ApplicationDbContext context, Dictionary<string, Category> categories, ILogger logger)
-    {
-        const string businessName = "Ntombi's Braai Stand";
-        if (await context.VendorProfiles.AnyAsync(v => v.BusinessName == businessName))
-            return;
-
-        var addedBy = await context.Users.FirstOrDefaultAsync(u => u.Email == "naledi.dube@ngila.demo");
-        if (addedBy is null)
-        {
-            logger.LogWarning("Skipped community-added vendor seeding - seed customer not found.");
-            return;
-        }
-
-        context.VendorProfiles.Add(new VendorProfile
-        {
-            UserId = null,
-            AddedByUserId = addedBy.Id,
-            BusinessName = businessName,
-            Description = "Weekend braai spot near the taxi rank - amazing chops, cash only.",
-            Categories = { categories["Food"] },
-            LocationDescription = "Next to the Bree Street taxi rank, Braamfontein",
-            Latitude = -26.1955m,
-            Longitude = 28.0330m,
-            ContactPhone = null,
-            Status = VendorStatus.PendingVerification,
-        });
-
-        await context.SaveChangesAsync();
-        logger.LogInformation("Seeded 1 unclaimed community-added vendor.");
     }
 
     private static async Task SeedNotificationsAsync(ApplicationDbContext context, ILogger logger)

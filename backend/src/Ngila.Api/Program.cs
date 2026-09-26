@@ -146,7 +146,6 @@ builder.Services.AddScoped<IFeedService, FeedService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
-builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 
 // ---------- Validation ----------

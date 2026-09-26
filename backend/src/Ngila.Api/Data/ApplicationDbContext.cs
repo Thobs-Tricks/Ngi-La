@@ -23,7 +23,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<VendorTradingHours> VendorTradingHours => Set<VendorTradingHours>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Notification> Notifications => Set<Notification>();
-    public DbSet<Report> Reports => Set<Report>();
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
     public DbSet<EmailSettings> EmailSettings => Set<EmailSettings>();
 
@@ -228,40 +227,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
-        });
-
-        builder.Entity<Report>(entity =>
-        {
-            entity.Property(r => r.Title).HasMaxLength(200).IsRequired();
-            entity.Property(r => r.Detail).HasMaxLength(1000).IsRequired();
-
-            entity.HasOne(r => r.ReporterUser)
-                .WithMany()
-                .HasForeignKey(r => r.ReporterUserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // All Restrict: Report already cascades from ReporterUserId, and SQL Server rejects
-            // a second cascade-capable path to the same ancestor - directly (ResolvedByUserId ->
-            // AspNetUsers) or transitively (TargetVendorId -> VendorProfiles, and
-            // TargetReviewId -> Reviews.VendorId -> VendorProfiles, both of which can reach
-            // AspNetUsers).
-            entity.HasOne(r => r.ResolvedByUser)
-                .WithMany()
-                .HasForeignKey(r => r.ResolvedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(r => r.TargetVendor)
-                .WithMany()
-                .HasForeignKey(r => r.TargetVendorId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(r => r.TargetReview)
-                .WithMany()
-                .HasForeignKey(r => r.TargetReviewId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasIndex(r => r.IsResolved);
-            entity.HasIndex(r => r.CreatedAt);
         });
 
         builder.Entity<ActivityLogEntry>(entity =>

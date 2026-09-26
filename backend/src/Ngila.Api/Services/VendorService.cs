@@ -92,35 +92,6 @@ public class VendorService : IVendorService
         return MapToResponse(vendor, latitude ?? GeoUtils.DefaultLatitude, longitude ?? GeoUtils.DefaultLongitude);
     }
 
-    public async Task<VendorResponse> AddVendorAsync(Guid addedByUserId, AddVendorRequest request, CancellationToken ct = default)
-    {
-        var category = await _context.Categories.FirstOrDefaultAsync(c => c.Id == request.CategoryId, ct);
-        if (category is null)
-            throw new InvalidOperationException("Selected category does not exist.");
-
-        var vendor = new VendorProfile
-        {
-            UserId = null, // unclaimed - see product doc's "community vendor discovery"
-            AddedByUserId = addedByUserId,
-            BusinessName = request.BusinessName,
-            Description = request.Description,
-            Categories = { category },
-            LocationDescription = request.LocationDescription,
-            Latitude = request.Latitude,
-            Longitude = request.Longitude,
-            ContactPhone = request.ContactPhone,
-            ImageUrl = request.ImageUrl,
-            Status = VendorStatus.PendingVerification,
-        };
-
-        _context.VendorProfiles.Add(vendor);
-        await _context.SaveChangesAsync(ct);
-
-        await _activityLog.LogAsync(addedByUserId, $"added {vendor.BusinessName}", "vendor-added", ct);
-
-        return MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude);
-    }
-
     public async Task<ServiceResult<VendorResponse>> GetOwnProfileAsync(Guid userId, CancellationToken ct = default)
     {
         var vendor = await OwnProfileQuery().FirstOrDefaultAsync(v => v.UserId == userId, ct);
@@ -133,9 +104,6 @@ public class VendorService : IVendorService
 
     public async Task<ServiceResult<VendorResponse>> UpsertOwnProfileAsync(Guid userId, UpsertVendorProfileRequest request, CancellationToken ct = default)
     {
-        if (request.PhotoUrls is { Count: > MaxGalleryPhotos })
-            return ServiceResult<VendorResponse>.Failure($"You can add up to {MaxGalleryPhotos} photos.", 400);
-
         var categories = await _context.Categories.Where(c => request.CategoryIds.Contains(c.Id)).ToListAsync(ct);
         if (categories.Count != request.CategoryIds.Distinct().Count())
             return ServiceResult<VendorResponse>.Failure("One or more selected categories does not exist.", 400);
@@ -159,39 +127,11 @@ public class VendorService : IVendorService
 
         // Full replace - resend the whole set each time, not a diff/patch. Categories are
         // pre-existing rows being re-linked (not created), so mutating the tracked collection in
-        // place is safe here - unlike Photos/TradingHours below, there's no "new row with an
-        // already-set key" ambiguity for EF to misread.
+        // place is safe here - unlike the Photos/TradingHours replace pattern below, there's no
+        // "new row with an already-set key" ambiguity for EF to misread.
         vendor.Categories.Clear();
         foreach (var category in categories)
             vendor.Categories.Add(category);
-
-        // Photos and TradingHours are added straight to their DbSets rather than through the
-        // navigation collection: both entities carry a non-default Guid Id (set by the entity's
-        // own constructor), and when EF only discovers new rows via navigation-collection fixup
-        // on an already-tracked parent, it assumes a non-default key means "existing row" and
-        // marks them Modified instead of Added - producing UPDATEs that hit zero rows. Adding via
-        // the DbSet directly forces Added state unambiguously regardless of the key's value.
-        if (vendor.Photos.Count > 0)
-            _context.VendorProfilePhotos.RemoveRange(vendor.Photos);
-        vendor.Photos.Clear();
-        _context.VendorProfilePhotos.AddRange(
-            (request.PhotoUrls ?? Array.Empty<string>())
-                .Select((url, index) => new VendorProfilePhoto { VendorProfileId = vendor.Id, Url = url, SortOrder = index }));
-
-        if (vendor.TradingHours.Count > 0)
-            _context.VendorTradingHours.RemoveRange(vendor.TradingHours);
-        vendor.TradingHours.Clear();
-        if (request.TradingHours is not null)
-        {
-            _context.VendorTradingHours.AddRange(request.TradingHours.Select(h => new VendorTradingHours
-            {
-                VendorProfileId = vendor.Id,
-                DayOfWeek = Enum.Parse<DayOfWeek>(h.Day),
-                IsOpen = h.IsOpen,
-                OpenTime = h.IsOpen && h.OpenTime is not null ? TimeSpan.ParseExact(h.OpenTime, "hh\\:mm", null) : null,
-                CloseTime = h.IsOpen && h.CloseTime is not null ? TimeSpan.ParseExact(h.CloseTime, "hh\\:mm", null) : null,
-            }));
-        }
 
         await _context.SaveChangesAsync(ct);
 
@@ -200,6 +140,58 @@ public class VendorService : IVendorService
 
         return ServiceResult<VendorResponse>.Success(
             MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude), isNew ? 201 : 200);
+    }
+
+    public async Task<ServiceResult<VendorResponse>> UpdateOwnTradingHoursAsync(Guid userId, UpdateVendorTradingHoursRequest request, CancellationToken ct = default)
+    {
+        var vendor = await OwnProfileQuery().FirstOrDefaultAsync(v => v.UserId == userId, ct);
+        if (vendor is null)
+            return ServiceResult<VendorResponse>.Failure("You haven't set up your shop profile yet.", 404);
+
+        // Added straight to the DbSet rather than through the navigation collection: the entity
+        // carries a non-default Guid Id (set by its own constructor), and when EF only discovers
+        // new rows via navigation-collection fixup on an already-tracked parent, it assumes a
+        // non-default key means "existing row" and marks them Modified instead of Added -
+        // producing UPDATEs that hit zero rows. Adding via the DbSet directly forces Added state
+        // unambiguously regardless of the key's value.
+        if (vendor.TradingHours.Count > 0)
+            _context.VendorTradingHours.RemoveRange(vendor.TradingHours);
+        vendor.TradingHours.Clear();
+        _context.VendorTradingHours.AddRange(request.TradingHours.Select(h => new VendorTradingHours
+        {
+            VendorProfileId = vendor.Id,
+            DayOfWeek = Enum.Parse<DayOfWeek>(h.Day),
+            IsOpen = h.IsOpen,
+            OpenTime = h.IsOpen && h.OpenTime is not null ? TimeSpan.ParseExact(h.OpenTime, "hh\\:mm", null) : null,
+            CloseTime = h.IsOpen && h.CloseTime is not null ? TimeSpan.ParseExact(h.CloseTime, "hh\\:mm", null) : null,
+        }));
+
+        await _context.SaveChangesAsync(ct);
+
+        return ServiceResult<VendorResponse>.Success(
+            MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude));
+    }
+
+    public async Task<ServiceResult<VendorResponse>> UpdateOwnPhotosAsync(Guid userId, UpdateVendorPhotosRequest request, CancellationToken ct = default)
+    {
+        if (request.PhotoUrls.Count > MaxGalleryPhotos)
+            return ServiceResult<VendorResponse>.Failure($"You can add up to {MaxGalleryPhotos} photos.", 400);
+
+        var vendor = await OwnProfileQuery().FirstOrDefaultAsync(v => v.UserId == userId, ct);
+        if (vendor is null)
+            return ServiceResult<VendorResponse>.Failure("You haven't set up your shop profile yet.", 404);
+
+        // Same DbSet-direct pattern as trading hours above, for the same reason.
+        if (vendor.Photos.Count > 0)
+            _context.VendorProfilePhotos.RemoveRange(vendor.Photos);
+        vendor.Photos.Clear();
+        _context.VendorProfilePhotos.AddRange(
+            request.PhotoUrls.Select((url, index) => new VendorProfilePhoto { VendorProfileId = vendor.Id, Url = url, SortOrder = index }));
+
+        await _context.SaveChangesAsync(ct);
+
+        return ServiceResult<VendorResponse>.Success(
+            MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude));
     }
 
     public async Task<IReadOnlyList<VerificationQueueItemResponse>> GetVerificationQueueAsync(CancellationToken ct = default)

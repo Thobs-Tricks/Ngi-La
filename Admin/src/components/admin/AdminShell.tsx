@@ -1,22 +1,23 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { fetchStats } from "@/lib/endpoints";
 
-type NavItem = { to: "/" | "/verification" | "/vendors" | "/categories" | "/reports" | "/users" | "/settings"; label: string; badgeKey?: "verification" | "reports" };
+type NavItem = { to: "/" | "/verification" | "/vendors" | "/categories" | "/users" | "/admins" | "/profile" | "/settings"; label: string; badgeKey?: "verification" };
 
 const inspect: NavItem[] = [
   { to: "/", label: "Overview" },
   { to: "/verification", label: "Verification", badgeKey: "verification" },
   { to: "/vendors", label: "Claims & Vendors" },
   { to: "/categories", label: "Categories" },
-  { to: "/reports", label: "Reports", badgeKey: "reports" },
 ];
 
 const insight: NavItem[] = [
   { to: "/users", label: "Users & Contributors" },
+  { to: "/admins", label: "Admins" },
+  { to: "/profile", label: "Profile" },
   { to: "/settings", label: "Settings" },
 ];
 
@@ -48,6 +49,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s: { location: { pathname: string } }) => s.location.pathname });
   const navigate = useNavigate();
   const { status, user, logout } = useAuth();
+  const [search, setSearch] = useState("");
+
+  const runSearch = () => {
+    const q = search.trim();
+    if (!q) return;
+    void navigate({ to: "/vendors", search: { q } });
+  };
 
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
@@ -69,7 +77,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const badges = { verification: stats?.pendingVerification, reports: stats?.reportsOpen };
+  const badges = { verification: stats?.pendingVerification };
   const initials = user
     ? `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase()
     : "";
@@ -132,7 +140,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <div className="flex items-center gap-2 rounded-lg bg-surface/70 px-3 py-2 text-[13px] ring-1 ring-line">
                 <span className="text-mute">⌕</span>
                 <input
-                  placeholder="Search vendors, claims, reports…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && runSearch()}
+                  placeholder="Search vendors, claims…"
                   className="min-w-0 flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-mute"
                 />
               </div>

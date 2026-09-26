@@ -33,7 +33,14 @@ export type AdminStats = {
   communityAdded: number;
   pendingVerification: number;
   activeUsers: number;
-  reportsOpen: number;
+};
+
+// Public (unauthenticated) platform stats - GET /api/stats. Used on the login screen, which has
+// no admin session yet to call the authenticated /api/admin/stats with.
+export type PlatformStats = {
+  vendorCount: number;
+  reviewCount: number;
+  areaCount: number;
 };
 
 export type ActivityItem = {
@@ -88,18 +95,6 @@ export type Category = {
   id: string;
   name: string;
   vendorCount: number;
-};
-
-export type ReportKind = "Flag" | "ReviewDispute";
-
-export type Report = {
-  id: string;
-  kind: string;
-  priority: string;
-  title: string;
-  detail: string;
-  isResolved: boolean;
-  time: string;
 };
 
 export type EmailSettings = {

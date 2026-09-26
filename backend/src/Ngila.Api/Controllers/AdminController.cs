@@ -50,6 +50,27 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
+    /// Disables a Customer or Vendor account's ability to log in and revokes any live sessions.
+    /// </summary>
+    [HttpPost("users/{id:guid}/suspend")]
+    public async Task<IActionResult> SuspendUser(Guid id, CancellationToken ct)
+    {
+        var result = await _adminService.SetUserActiveAsync(id, false, User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    [HttpPost("users/{id:guid}/unsuspend")]
+    public async Task<IActionResult> UnsuspendUser(Guid id, CancellationToken ct)
+    {
+        var result = await _adminService.SetUserActiveAsync(id, true, User.GetUserId(), ct);
+        return result.Succeeded
+            ? Ok(result.Data)
+            : StatusCode(result.StatusCode, new ProblemDetails { Title = result.Error, Status = result.StatusCode });
+    }
+
+    /// <summary>
     /// Support tool: reset a user's password and mark their account confirmed. Useful when
     /// email delivery isn't configured yet (see GET/PUT email-settings below), or an email just
     /// never arrived - the confirmation/reset link is otherwise the only way in.

@@ -23,11 +23,25 @@ public class UpsertVendorProfileRequestValidator : AbstractValidator<UpsertVendo
             .Must(url => Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
             .When(x => !string.IsNullOrWhiteSpace(x.ImageUrl))
             .WithMessage("ImageUrl must be a valid absolute http(s) URL.");
-        RuleFor(x => x.PhotoUrls).Must(urls => urls is null || urls.Count <= 5)
-            .WithMessage("You can add up to 5 photos.");
+    }
+}
+
+public class UpdateVendorTradingHoursRequestValidator : AbstractValidator<UpdateVendorTradingHoursRequest>
+{
+    public UpdateVendorTradingHoursRequestValidator()
+    {
         RuleForEach(x => x.TradingHours).SetValidator(new TradingHourRequestValidator());
         RuleFor(x => x.TradingHours)
-            .Must(hours => hours is null || hours.Select(h => h.Day).Distinct().Count() == hours.Count)
+            .Must(hours => hours.Select(h => h.Day).Distinct().Count() == hours.Count)
             .WithMessage("Each day can only appear once in TradingHours.");
+    }
+}
+
+public class UpdateVendorPhotosRequestValidator : AbstractValidator<UpdateVendorPhotosRequest>
+{
+    public UpdateVendorPhotosRequestValidator()
+    {
+        RuleFor(x => x.PhotoUrls).Must(urls => urls.Count <= 5)
+            .WithMessage("You can add up to 5 photos.");
     }
 }

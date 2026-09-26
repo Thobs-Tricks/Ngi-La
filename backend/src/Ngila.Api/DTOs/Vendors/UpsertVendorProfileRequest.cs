@@ -1,8 +1,10 @@
 namespace Ngila.Api.DTOs.Vendors;
 
 // Creates the calling vendor's shop profile if they don't have one yet, or updates it if they
-// do - one endpoint covers both "MySpaza" setup and later edits. Every list field here is a full
-// replace, same as the scalar fields - resend the whole set each time, not a diff/patch.
+// do - covers "MySpaza" setup and later edits of the core business details. Trading hours and
+// photos are saved separately via UpdateVendorTradingHoursRequest/UpdateVendorPhotosRequest, so
+// the app can save one section without resending the others. CategoryIds is still a full
+// replace - resend the whole set each time, not a diff/patch.
 public record UpsertVendorProfileRequest(
     string BusinessName,
     string? Description,
@@ -11,6 +13,10 @@ public record UpsertVendorProfileRequest(
     decimal? Latitude,
     decimal? Longitude,
     string? ContactPhone,
-    IReadOnlyList<TradingHourRequest>? TradingHours,
-    string? ImageUrl,
-    IReadOnlyList<string>? PhotoUrls);
+    string? ImageUrl);
+
+// Full replace of the calling vendor's weekly trading hours.
+public record UpdateVendorTradingHoursRequest(IReadOnlyList<TradingHourRequest> TradingHours);
+
+// Full replace of the calling vendor's gallery photos (max 5, enforced in VendorService).
+public record UpdateVendorPhotosRequest(IReadOnlyList<string> PhotoUrls);

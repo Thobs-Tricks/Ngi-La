@@ -30,9 +30,8 @@ public class AdminService : IAdminService
         var pendingVerification = await _context.VendorProfiles
             .CountAsync(v => v.Status == VendorStatus.PendingVerification && v.UserId != null, ct);
         var activeUsers = await _context.Users.CountAsync(u => u.IsActive, ct);
-        var reportsOpen = await _context.Reports.CountAsync(r => !r.IsResolved, ct);
 
-        return new AdminStatsResponse(totalVendors, communityAdded, pendingVerification, activeUsers, reportsOpen);
+        return new AdminStatsResponse(totalVendors, communityAdded, pendingVerification, activeUsers);
     }
 
     public async Task<IReadOnlyList<AdminUserResponse>> GetUsersAsync(CancellationToken ct = default)
@@ -73,6 +72,71 @@ public class AdminService : IAdminService
                 reviewsByUserId.GetValueOrDefault(u.Id, 0)))
             .OrderByDescending(u => u.VendorsAdded + u.ReviewsWritten)
             .ToList();
+    }
+
+    public async Task<ServiceResult<AdminUserResponse>> SetUserActiveAsync(Guid targetUserId, bool active, Guid adminUserId, CancellationToken ct = default)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == targetUserId, ct);
+        if (user is null)
+            return ServiceResult<AdminUserResponse>.Failure("User not found.", 404);
+
+        var role = await GetRoleNameAsync(targetUserId, ct);
+        if (role == Roles.Admin)
+            return ServiceResult<AdminUserResponse>.Failure("Admin accounts can't be suspended here.", 400);
+
+        if (user.IsActive == active)
+            return ServiceResult<AdminUserResponse>.Failure(
+                active ? "This account isn't suspended." : "This account is already suspended.", 400);
+
+        user.IsActive = active;
+        await _context.SaveChangesAsync(ct);
+
+        // Suspending revokes every active session, same as an admin-triggered password reset -
+        // otherwise a suspended user with a live refresh token could keep minting new access
+        // tokens until it expires on its own.
+        if (!active)
+        {
+            var activeTokens = await _context.RefreshTokens
+                .Where(rt => rt.UserId == user.Id && rt.RevokedAt == null && rt.ExpiresAt > DateTime.UtcNow)
+                .ToListAsync(ct);
+            foreach (var refreshToken in activeTokens)
+            {
+                refreshToken.RevokedAt = DateTime.UtcNow;
+                refreshToken.ReasonRevoked = "Account was suspended by an admin";
+            }
+            if (activeTokens.Count > 0)
+                await _context.SaveChangesAsync(ct);
+        }
+
+        await _activityLog.LogAsync(
+            adminUserId,
+            $"{(active ? "reinstated" : "suspended")} {user.Email}",
+            active ? "user-reinstated" : "user-suspended", ct);
+
+        var vendorsAdded = await _context.VendorProfiles.CountAsync(v => v.AddedByUserId == targetUserId, ct);
+        var reviewsWritten = await _context.Reviews.CountAsync(r => r.UserId == targetUserId, ct);
+
+        return ServiceResult<AdminUserResponse>.Success(new AdminUserResponse(
+            user.Id,
+            $"{user.FirstName} {user.LastName}",
+            user.Email!,
+            role,
+            user.IsActive,
+            user.CreatedAt.ToString("MMM yyyy"),
+            vendorsAdded,
+            reviewsWritten));
+    }
+
+    private async Task<string> GetRoleNameAsync(Guid userId, CancellationToken ct)
+    {
+        var roleName = await (
+            from userRole in _context.UserRoles
+            where userRole.UserId == userId
+            join role in _context.Roles on userRole.RoleId equals role.Id
+            select role.Name)
+            .FirstOrDefaultAsync(ct);
+
+        return roleName ?? "Unknown";
     }
 
     public async Task<ServiceResult<MessageResponse>> ResetUserPasswordAsync(Guid adminUserId, AdminResetPasswordRequest request, CancellationToken ct = default)

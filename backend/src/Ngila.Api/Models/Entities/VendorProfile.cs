@@ -6,13 +6,15 @@ public class VendorProfile
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    // Null = "community-added" and not yet claimed by the actual business owner - the core
-    // Ngila mechanic where a customer can add a vendor before it has any account at all.
+    // Null = unclaimed - no owning account yet. New profiles are always created with a UserId
+    // (self-registration via PUT /api/vendors/me); a null value here only ever comes from legacy
+    // data or an admin explicitly reverting a claim (see VendorService.RejectClaimAsync).
     public Guid? UserId { get; set; }
     public ApplicationUser? User { get; set; }
 
-    // The customer (or vendor) who community-added this listing, for attribution and so we can
-    // notify them once it gets claimed. Null for vendors created via ordinary self-registration.
+    // Legacy attribution field from the retired "community-added vendor" feature - kept only so
+    // the admin console's existing "suggested by" display keeps working for old rows. Never set
+    // by any current code path.
     public Guid? AddedByUserId { get; set; }
     public ApplicationUser? AddedByUser { get; set; }
 
@@ -21,8 +23,7 @@ public class VendorProfile
     public VendorStatus Status { get; set; } = VendorStatus.PendingVerification;
 
     // Many-to-many (EF skip navigation, no explicit join entity needed) - a spaza selling both
-    // kota and airtime picks both categories. Community-added vendors (AddVendorRequest) only
-    // ever get one, since whoever spots them can't reliably know the full range they sell.
+    // kota and airtime picks both categories.
     public ICollection<Category> Categories { get; set; } = new List<Category>();
 
     // Free-text location, since many informal vendors have no formal street address

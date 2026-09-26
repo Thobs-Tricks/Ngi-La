@@ -20,6 +20,8 @@ export const Route = createFileRoute("/vendors")({
       { property: "og:description", content: "Browse, filter and manage every vendor listing on Ngila." },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { q?: string } =>
+    typeof search["q"] === "string" ? { q: search["q"] } : {},
   component: Vendors,
 });
 
@@ -35,8 +37,9 @@ const filterLabel: Record<(typeof filters)[number], string> = {
 function Vendors() {
   const { status } = useAuth();
   const queryClient = useQueryClient();
+  const { q: initialQ } = Route.useSearch();
   const [f, setF] = useState<(typeof filters)[number]>("All");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQ ?? "");
 
   const { data: vendors, isLoading } = useQuery({
     queryKey: ["admin-vendors"],

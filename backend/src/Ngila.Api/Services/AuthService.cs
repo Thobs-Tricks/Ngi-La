@@ -4,7 +4,6 @@ using Ngila.Api.Common;
 using Ngila.Api.Data;
 using Ngila.Api.DTOs.Auth;
 using Ngila.Api.DTOs.Common;
-using Ngila.Api.DTOs.Vendors;
 using Ngila.Api.Models.Entities;
 using Ngila.Api.Models.Enums;
 using Ngila.Api.Services.Interfaces;
@@ -21,8 +20,6 @@ public class AuthService : IAuthService
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly IEmailService _emailService;
-    private readonly INotificationService _notificationService;
-    private readonly IActivityLogService _activityLog;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -31,8 +28,6 @@ public class AuthService : IAuthService
         ApplicationDbContext context,
         ITokenService tokenService,
         IEmailService emailService,
-        INotificationService notificationService,
-        IActivityLogService activityLog,
         ILogger<AuthService> logger)
     {
         _userManager = userManager;
@@ -40,8 +35,6 @@ public class AuthService : IAuthService
         _context = context;
         _tokenService = tokenService;
         _emailService = emailService;
-        _notificationService = notificationService;
-        _activityLog = activityLog;
         _logger = logger;
     }
 
@@ -78,8 +71,7 @@ public class AuthService : IAuthService
             _context.CustomerProfiles.Add(new CustomerProfile { UserId = user.Id });
             await _context.SaveChangesAsync(ct);
         }
-        // Vendor: no VendorProfile created here - set up afterwards via PUT /api/vendors/me, or
-        // acquired all at once by claiming an existing unclaimed listing (ClaimVendorAsync).
+        // Vendor: no VendorProfile created here - set up afterwards via PUT /api/vendors/me.
 
         if (request.UserType == UserType.Admin)
         {
@@ -99,49 +91,6 @@ public class AuthService : IAuthService
 
         return ServiceResult<MessageResponse>.Success(
             new MessageResponse("Registration successful. Please check your email to confirm your account."), 201);
-    }
-
-    public async Task<ServiceResult<MessageResponse>> ClaimVendorAsync(Guid vendorId, ClaimVendorRequest request, CancellationToken ct = default)
-    {
-        var vendor = await _context.VendorProfiles.FirstOrDefaultAsync(v => v.Id == vendorId, ct);
-        if (vendor is null)
-            return ServiceResult<MessageResponse>.Failure("Vendor not found.", 404);
-
-        if (vendor.UserId is not null)
-            return ServiceResult<MessageResponse>.Failure("This vendor has already been claimed.", 409);
-
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
-
-        var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Vendor);
-
-        if (!createResult.Succeeded || createResult.Data is null)
-            return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
-
-        var user = createResult.Data;
-
-        vendor.UserId = user.Id;
-        await _context.SaveChangesAsync(ct);
-
-        var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-        await transaction.CommitAsync(ct);
-
-        await _emailService.SendEmailConfirmationAsync(user.Email!, user.Id, confirmationToken, ct);
-
-        if (vendor.AddedByUserId is not null)
-        {
-            await _notificationService.NotifyAsync(
-                vendor.AddedByUserId.Value,
-                "Your suggested vendor was claimed!",
-                $"{vendor.BusinessName}, which you added to Ngila, has been claimed by its owner.",
-                vendor.Id,
-                ct);
-        }
-
-        await _activityLog.LogAsync(user.Id, $"claimed {vendor.BusinessName}", "vendor-claimed", ct);
-
-        return ServiceResult<MessageResponse>.Success(
-            new MessageResponse("Vendor claimed successfully. Please check your email to confirm your account."), 201);
     }
 
     public async Task<ServiceResult<AuthResponse>> LoginAsync(LoginRequest request, string? ipAddress, CancellationToken ct = default)

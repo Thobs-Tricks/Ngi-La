@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
+import { fetchPlatformStats } from "@/lib/endpoints";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -20,6 +22,9 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Public endpoint - no session exists yet on this screen.
+  const { data: stats } = useQuery({ queryKey: ["platform-stats"], queryFn: fetchPlatformStats });
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,8 +71,8 @@ function LoginPage() {
                 Keep vendor claims and local listings trusted.
               </h1>
               <p className="mt-5 text-base leading-7 text-paper/75">
-                Track reports, review verification queues, and inspect contributor activity from one
-                command center.
+                Review verification queues and inspect contributor activity from one command
+                center.
               </p>
             </div>
 
@@ -78,13 +83,14 @@ function LoginPage() {
                   Healthy
                 </span>
               </div>
-              <div className="grid gap-2">
-                <div className="flex items-end justify-between">
-                  <span className="font-display text-3xl font-bold">28.4k</span>
-                  <span className="font-mono text-[11px] text-paper/60">vendors</span>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <span className="font-display text-3xl font-bold">{stats ? stats.vendorCount.toLocaleString() : "—"}</span>
+                  <span className="ml-2 font-mono text-[11px] text-paper/60">vendors</span>
                 </div>
-                <div className="h-2 rounded-full bg-paper/10">
-                  <div className="h-full w-[72%] rounded-full bg-ember" />
+                <div>
+                  <span className="font-display text-3xl font-bold">{stats ? stats.reviewCount.toLocaleString() : "—"}</span>
+                  <span className="ml-2 font-mono text-[11px] text-paper/60">reviews</span>
                 </div>
               </div>
             </div>
@@ -92,19 +98,11 @@ function LoginPage() {
 
           <div className="flex items-center justify-center bg-paper/80 p-6 sm:p-8 lg:p-10">
             <div className="w-full max-w-md">
-              <div className="mb-8 flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.26em] text-mute">
-                    Welcome back
-                  </p>
-                  <h2 className="mt-2 font-display text-3xl font-bold tracking-tight">Log in</h2>
-                </div>
-                <Link
-                  to="/register"
-                  className="rounded-lg border border-line bg-surface px-2.5 py-2 text-[12px] font-medium text-ink transition hover:bg-surface/80"
-                >
-                  Register
-                </Link>
+              <div className="mb-8">
+                <p className="font-mono text-[10px] uppercase tracking-[0.26em] text-mute">
+                  Welcome back
+                </p>
+                <h2 className="mt-2 font-display text-3xl font-bold tracking-tight">Log in</h2>
               </div>
 
               <form className="space-y-5" onSubmit={onSubmit}>
@@ -149,15 +147,6 @@ function LoginPage() {
                   {submitting ? "Signing in…" : "Sign in"}
                 </button>
               </form>
-
-              <div className="mt-7">
-                <Link
-                  to="/register"
-                  className="text-center text-[13px] text-mute hover:text-ink"
-                >
-                  Need an account? <span className="font-medium text-ember">Create one</span>
-                </Link>
-              </div>
             </div>
           </div>
         </div>
