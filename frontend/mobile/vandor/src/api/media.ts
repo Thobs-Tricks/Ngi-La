@@ -21,29 +21,21 @@ export interface MediaUploadResult {
   resourceType: string;
 }
 
-/** uri is a local file:// (or content://) URI from expo-image-picker - never a remote URL
- * already, since there'd be nothing to upload. */
-export async function uploadImage(uri: string, accessToken: string): Promise<string> {
-  const filename = uri.split('/').pop() || `photo-${Date.now()}.jpg`;
-  const extension = filename.split('.').pop()?.toLowerCase() ?? 'jpg';
-  // Falls back to jpeg for anything unrecognised (including a content:// URI with no extension
-  // at all) - the API now accepts by Content-Type too and transcodes every upload to jpg
-  // server-side, so this only needs to be a reasonable guess, not exact.
-  const mimeType =
-    extension === 'png' ? 'image/png'
-    : extension === 'webp' ? 'image/webp'
-    : extension === 'gif' ? 'image/gif'
-    : extension === 'heic' ? 'image/heic'
-    : extension === 'heif' ? 'image/heif'
-    : 'image/jpeg';
-
-  const form = new FormData();
-  // React Native's fetch accepts this {uri, name, type} shape for a file part - it is not a
-  // real Blob, but RN's FormData polyfill knows how to stream it.
-  form.append('file', { uri, name: filename, type: mimeType } as unknown as Blob);
-
-  const data = await apiClient.upload<UploadResponse>('/media/upload', form, accessToken);
-  return data.url;
+/** Full-resolution camera photos (often 3000px+ and several MB each) are
+ * slower and more failure-prone to upload than they need to be. This
+ * downsizes to a reasonable max width and re-compresses as JPEG first. */
+async function prepareForUpload(uri: string): Promise<{ uri: string; mimeType: string }> {
+  try {
+    const result = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 1280 } }], {
+      compress: 0.7,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    return { uri: result.uri, mimeType: 'image/jpeg' };
+  } catch {
+    // If resizing fails for any reason, fall back to uploading the original
+    // rather than blocking the whole flow on it.
+    return { uri, mimeType: 'image/jpeg' };
+  }
 }
 
 /** Uploads a single local image (from expo-image-picker) and returns its
