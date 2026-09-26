@@ -183,12 +183,11 @@ public static class DbSeeder
                 UserId = user.Id,
                 BusinessName = seed.BusinessName,
                 Description = seed.Description,
-                CategoryId = categories[seed.CategoryName].Id,
+                Categories = { categories[seed.CategoryName] },
                 LocationDescription = seed.Location,
                 Latitude = seed.Latitude,
                 Longitude = seed.Longitude,
-                OpeningTime = seed.OpeningTime,
-                ClosingTime = seed.ClosingTime,
+                TradingHours = EveryDay(seed.OpeningTime, seed.ClosingTime),
                 Status = seed.Status,
                 Rating = seed.Rating,
                 ReviewsCount = seed.ReviewsCount,
@@ -363,7 +362,7 @@ public static class DbSeeder
             AddedByUserId = addedBy.Id,
             BusinessName = businessName,
             Description = "Weekend braai spot near the taxi rank - amazing chops, cash only.",
-            CategoryId = categories["Food"].Id,
+            Categories = { categories["Food"] },
             LocationDescription = "Next to the Bree Street taxi rank, Braamfontein",
             Latitude = -26.1955m,
             Longitude = 28.0330m,
@@ -410,6 +409,13 @@ public static class DbSeeder
         await context.SaveChangesAsync();
         logger.LogInformation("Seeded 2 demo notifications.");
     }
+
+    // Same hours every day of the week - just enough for seed data to have a working "open now"
+    // status; a real vendor edits this per-day via PUT /api/vendors/me.
+    private static List<VendorTradingHours> EveryDay(TimeSpan openingTime, TimeSpan closingTime) =>
+        Enum.GetValues<DayOfWeek>()
+            .Select(day => new VendorTradingHours { DayOfWeek = day, IsOpen = true, OpenTime = openingTime, CloseTime = closingTime })
+            .ToList();
 
     private sealed record DemoVendorSeed(
         string FirstName,

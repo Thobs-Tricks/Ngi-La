@@ -24,7 +24,7 @@ public class FeedService : IFeedService
         var posts = await _context.FeedPosts
             .Include(f => f.AuthorUser)
             .Include(f => f.Vendor)
-            .ThenInclude(v => v!.Category)
+            .ThenInclude(v => v!.Categories)
             .Include(f => f.Photos)
             .OrderByDescending(f => f.CreatedAt)
             .Take(take)
@@ -66,7 +66,7 @@ public class FeedService : IFeedService
         post.AuthorUser = await _context.Users.FirstAsync(u => u.Id == authorUserId, ct);
         post.Vendor = request.VendorId is null
             ? null
-            : await _context.VendorProfiles.Include(v => v.Category).FirstOrDefaultAsync(v => v.Id == request.VendorId, ct);
+            : await _context.VendorProfiles.Include(v => v.Categories).FirstOrDefaultAsync(v => v.Id == request.VendorId, ct);
 
         return ServiceResult<FeedItemResponse>.Success(MapToResponse(post, likedByMe: false), 201);
     }
@@ -153,7 +153,7 @@ public class FeedService : IFeedService
         Content: f.Content,
         VendorId: f.VendorId,
         VendorName: f.Vendor?.BusinessName,
-        VendorCategory: f.Vendor?.Category?.Name,
+        VendorCategory: f.Vendor is null || f.Vendor.Categories.Count == 0 ? null : f.Vendor.Categories.First().Name,
         Likes: f.LikesCount,
         Comments: f.CommentsCount,
         Avatar: DisplayFormatting.Initials(f.AuthorUser.FirstName, f.AuthorUser.LastName),

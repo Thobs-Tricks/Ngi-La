@@ -20,8 +20,10 @@ public class VendorProfile
     public string? Description { get; set; }
     public VendorStatus Status { get; set; } = VendorStatus.PendingVerification;
 
-    public Guid? CategoryId { get; set; }
-    public Category? Category { get; set; }
+    // Many-to-many (EF skip navigation, no explicit join entity needed) - a spaza selling both
+    // kota and airtime picks both categories. Community-added vendors (AddVendorRequest) only
+    // ever get one, since whoever spots them can't reliably know the full range they sell.
+    public ICollection<Category> Categories { get; set; } = new List<Category>();
 
     // Free-text location, since many informal vendors have no formal street address
     // (e.g. "next to the taxi rank") - see product doc section on location uncertainty.
@@ -29,8 +31,10 @@ public class VendorProfile
     public decimal? Latitude { get; set; }
     public decimal? Longitude { get; set; }
 
-    public TimeSpan? OpeningTime { get; set; }
-    public TimeSpan? ClosingTime { get; set; }
+    // One row per day of the week (0-7 rows in practice - see VendorService for how a full
+    // replace is enforced). Replaced OpeningTime/ClosingTime, which couldn't express "closed
+    // Sundays" or different weekend hours.
+    public ICollection<VendorTradingHours> TradingHours { get; set; } = new List<VendorTradingHours>();
 
     // The main listing photo - shown in discovery/search results and cards.
     public string? ImageUrl { get; set; }
@@ -60,4 +64,17 @@ public class VendorProfilePhoto
 
     public string Url { get; set; } = default!;
     public int SortOrder { get; set; }
+}
+
+public class VendorTradingHours
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid VendorProfileId { get; set; }
+    public VendorProfile VendorProfile { get; set; } = default!;
+
+    public DayOfWeek DayOfWeek { get; set; }
+    public bool IsOpen { get; set; }
+    public TimeSpan? OpenTime { get; set; }
+    public TimeSpan? CloseTime { get; set; }
 }

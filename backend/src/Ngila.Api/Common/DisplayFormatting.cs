@@ -45,27 +45,24 @@ public static class DisplayFormatting
         return utcTimestamp.ToString("dd MMM yyyy");
     }
 
-    public static bool IsOpenNow(TimeSpan? openingTime, TimeSpan? closingTime, DateTime? nowUtc = null)
+    // Trading hours are per-day (Models.Entities.VendorTradingHours) - both helpers below look up
+    // today's row (in SA local time) rather than taking a single opening/closing pair, since a
+    // vendor can trade different hours per day or be closed entirely on some.
+    public static bool IsOpenNow(IEnumerable<Models.Entities.VendorTradingHours> tradingHours, DateTime? nowUtc = null)
     {
-        if (openingTime is null || closingTime is null)
+        var now = nowUtc ?? DateTime.UtcNow;
+        var local = TimeZoneInfo.ConvertTimeFromUtc(now, SouthAfricaTimeZone);
+        var today = tradingHours.FirstOrDefault(h => h.DayOfWeek == local.DayOfWeek);
+
+        if (today is null || !today.IsOpen || today.OpenTime is null || today.CloseTime is null)
             return false;
 
-        var now = nowUtc ?? DateTime.UtcNow;
-        var localTime = TimeZoneInfo.ConvertTimeFromUtc(now, SouthAfricaTimeZone).TimeOfDay;
-
-        return openingTime <= closingTime
-            ? localTime >= openingTime && localTime <= closingTime
+        var localTime = local.TimeOfDay;
+        return today.OpenTime <= today.CloseTime
+            ? localTime >= today.OpenTime && localTime <= today.CloseTime
             // Overnight hours (e.g. open 18:00, closes 02:00 the next day).
-            : localTime >= openingTime || localTime <= closingTime;
+            : localTime >= today.OpenTime || localTime <= today.CloseTime;
     }
 
-    public static string FormatHours(TimeSpan? openingTime, TimeSpan? closingTime)
-    {
-        if (openingTime is null || closingTime is null)
-            return "Hours not set";
-
-        return $"{FormatTime(openingTime.Value)} - {FormatTime(closingTime.Value)}";
-    }
-
-    private static string FormatTime(TimeSpan time) => new DateTime(1, 1, 1).Add(time).ToString("HH:mm");
+    public static string FormatTime(TimeSpan time) => new DateTime(1, 1, 1).Add(time).ToString("HH:mm");
 }

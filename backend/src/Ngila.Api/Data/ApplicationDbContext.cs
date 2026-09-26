@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<FeedPostLike> FeedPostLikes => Set<FeedPostLike>();
     public DbSet<FeedPostComment> FeedPostComments => Set<FeedPostComment>();
     public DbSet<VendorProfilePhoto> VendorProfilePhotos => Set<VendorProfilePhoto>();
+    public DbSet<VendorTradingHours> VendorTradingHours => Set<VendorTradingHours>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Report> Reports => Set<Report>();
@@ -75,13 +76,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .HasForeignKey(v => v.AddedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            entity.HasOne(v => v.Category)
-                .WithMany(c => c.VendorProfiles)
-                .HasForeignKey(v => v.CategoryId)
-                .OnDelete(DeleteBehavior.SetNull);
+            // Many-to-many via EF's implicit skip-navigation join table (VendorProfileCategory) -
+            // no explicit join entity needed since the relationship carries no extra data.
+            entity.HasMany(v => v.Categories)
+                .WithMany(c => c.VendorProfiles);
 
             entity.HasIndex(v => v.UserId).IsUnique();
-            entity.HasIndex(v => v.CategoryId);
             entity.HasIndex(v => v.AddedByUserId);
         });
 
@@ -95,6 +95,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(p => p.VendorProfileId);
+        });
+
+        builder.Entity<VendorTradingHours>(entity =>
+        {
+            entity.HasOne(t => t.VendorProfile)
+                .WithMany(v => v.TradingHours)
+                .HasForeignKey(t => t.VendorProfileId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(t => t.VendorProfileId);
         });
 
         builder.Entity<CustomerProfile>(entity =>

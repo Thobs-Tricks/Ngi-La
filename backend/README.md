@@ -166,7 +166,16 @@ are two independent paths to owning a `VendorProfile`:
 | Endpoint | Auth | Notes |
 |---|---|---|
 | `GET /api/vendors/me` | Vendor only | The calling vendor's own shop profile. `404` if not set up yet |
-| `PUT /api/vendors/me` | Vendor only | Creates the profile the first time (`201`), updates it thereafter (`200`) — same endpoint for both, `{ businessName, description?, categoryId, locationDescription, latitude?, longitude?, openingTime?, closingTime?, imageUrl? }` |
+| `PUT /api/vendors/me` | Vendor only | Creates the profile the first time (`201`), updates it thereafter (`200`) — full replace every field, not a diff. `{ businessName, description?, categoryIds[], locationDescription, latitude?, longitude?, contactPhone?, tradingHours[]?, imageUrl?, photoUrls[]? }` |
+
+`categoryIds` is plural and can hold more than one — a spaza selling both kota and airtime picks
+both. `tradingHours` is a list of up to 7 entries, one per day: `{ day: "Monday".."Sunday",
+isOpen, openTime?: "HH:mm", closeTime?: "HH:mm" }` (`openTime`/`closeTime` required when
+`isOpen` is true) — replaced the old single `openingTime`/`closingTime` pair, which couldn't
+express "closed Sundays" or different weekend hours. `photoUrls` is the gallery (see Media
+below), capped at 5, separate from the single `imageUrl` main listing photo. `contactPhone` is
+the business's own number shown to customers — takes priority over the vendor's personal account
+phone if both are set.
 
 ## Community vendors, reviews & notifications
 
