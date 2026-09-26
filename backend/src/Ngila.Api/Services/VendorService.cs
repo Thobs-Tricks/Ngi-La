@@ -350,6 +350,8 @@ public class VendorService : IVendorService
         v.BusinessName,
         CategoryNames(v),
         v.LocationDescription ?? "Location not set",
+        v.Latitude,
+        v.Longitude,
         DeriveAdminStatus(v),
         v.Rating,
         v.ReviewsCount,

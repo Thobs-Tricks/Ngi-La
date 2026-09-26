@@ -5,6 +5,8 @@ public record AdminVendorResponse(
     string Name,
     string Category,
     string Location,
+    decimal? Latitude,
+    decimal? Longitude,
     string Status,
     decimal Rating,
     int ReviewsCount,

@@ -37,6 +37,11 @@ jobs:
 
       - name: Build
         working-directory: ${{ env.APP_DIR }}
+        env:
+          # Also baked in at build time, same as VITE_API_URL above - kept as a secret (not a
+          # plain env: value) since, unlike the API URL, this key is worth not publishing in
+          # plaintext in this public repo's workflow file.
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
         run: npm run build
 
       - name: Deploy to Azure Web App

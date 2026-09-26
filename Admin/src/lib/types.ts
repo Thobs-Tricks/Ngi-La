@@ -68,6 +68,8 @@ export type AdminVendor = {
   name: string;
   category: string;
   location: string;
+  latitude: number | null;
+  longitude: number | null;
   status: VendorAdminStatus;
   rating: number;
   reviewsCount: number;
