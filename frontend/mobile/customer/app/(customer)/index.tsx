@@ -11,12 +11,15 @@ import BottomNavigation, {
 } from "../../components/BottomNavigation";
 import VendorDetailSheet from "../../components/VendorDetailSheet";
 import Toast from "../../components/Toast";
+import LocationPermissionModal from "../../components/LocationPermissionModal";
+import LocationServicesModal from "../../components/LocationServicesModal";
 import {
     defaultTheme,
     ThemeMode,
     themes,
 } from "../../constants/theme";
 import { vendors } from "../../constants/vendor";
+import { useLocationContext } from "../../context/LocationContext";
 
 export default function CustomerHome() {
     const [activeTab, setActiveTab] =
@@ -38,6 +41,12 @@ export default function CustomerHome() {
         useState("");
 
     const theme = themes[themeMode];
+
+    const {
+        permissionStatus,
+        servicesEnabled,
+        retryLocation,
+    } = useLocationContext();
 
     const selectedVendor =
         vendors.find(
@@ -166,16 +175,26 @@ export default function CustomerHome() {
                     />
                 );
 
-            case "home":
-            default:
-                return (
-                    <HomeScreen
-                        theme={theme}
-                        onVendorPress={handleVendorPress}
-                    />
-                );
+                case "home":
+                default:
+                    return (
+                        <HomeScreen
+                            theme={theme}
+                            onVendorPress={handleVendorPress}
+                            onExploreVendors={() =>
+                                setActiveTab("discover")
+                            }
+                        />
+                    );
         }
     };
+
+    const permissionModalVisible =
+        permissionStatus !== "granted";
+
+    const servicesModalVisible =
+        permissionStatus === "granted" &&
+        servicesEnabled === false;
 
     return (
         <View
@@ -225,6 +244,18 @@ export default function CustomerHome() {
                 title={toastTitle}
                 description={toastDescription}
                 theme={theme}
+            />
+
+            <LocationPermissionModal
+                theme={theme}
+                visible={permissionModalVisible}
+                onAllowLocation={retryLocation}
+            />
+
+            <LocationServicesModal
+                theme={theme}
+                visible={servicesModalVisible}
+                onRetry={retryLocation}
             />
         </View>
     );
