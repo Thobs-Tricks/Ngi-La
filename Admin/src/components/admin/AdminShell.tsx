@@ -1,9 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { LogOut, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { fetchStats } from "@/lib/endpoints";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type NavItem = { to: "/" | "/verification" | "/vendors" | "/map" | "/categories" | "/users" | "/admins" | "/profile" | "/settings"; label: string; badgeKey?: "verification" };
 
@@ -161,13 +169,36 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 {stats.pendingVerification}
               </div>
             ) : null}
-            <Link
-              to="/profile"
-              className="grid size-9 place-items-center rounded-full bg-ink font-display text-xs font-semibold text-paper transition hover:opacity-90"
-              aria-label="Open profile"
-            >
-              {initials}
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="grid size-9 place-items-center rounded-full bg-ink font-display text-xs font-semibold text-paper transition hover:opacity-90"
+                  aria-label="Open profile menu"
+                >
+                  {initials}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 rounded-xl border border-line bg-surface p-1 shadow-lg">
+                <DropdownMenuItem asChild>
+                  <Link to="/profile" className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-[13px] text-ink hover:bg-ink/5">
+                    <UserRound className="h-4 w-4" />
+                    Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-line" />
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    void logout();
+                  }}
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-[13px] text-clay hover:bg-clay/10 focus:bg-clay/10"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </header>
 
           <div className="md:hidden">
