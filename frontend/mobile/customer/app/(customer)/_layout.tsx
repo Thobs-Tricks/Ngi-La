@@ -1,14 +1,17 @@
 import { Stack } from "expo-router";
+import { AuthProvider } from "../../context/AuthContext";
 import { LocationProvider } from "../../context/LocationContext";
 
 export default function CustomerLayout() {
     return (
-        <LocationProvider>
-            <Stack
-                screenOptions={{
-                    headerShown: false,
-                }}
-            />
-        </LocationProvider>
+        <AuthProvider>
+            <LocationProvider>
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                    }}
+                />
+            </LocationProvider>
+        </AuthProvider>
     );
 }

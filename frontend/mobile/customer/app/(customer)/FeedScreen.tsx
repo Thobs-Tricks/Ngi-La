@@ -15,12 +15,12 @@ import useFeed from "../../hooks/useFeed";
 
 type FeedScreenProps = {
     theme: Theme;
-    onAddVendor: () => void;
+    onAddPost: () => void;
 };
 
 export default function FeedScreen({
     theme,
-    onAddVendor,
+    onAddPost,
 }: FeedScreenProps) {
     const {
         filteredFeedItems,
@@ -79,7 +79,7 @@ export default function FeedScreen({
                 </View>
 
                 <Pressable
-                    onPress={onAddVendor}
+                    onPress={onAddPost}
                     style={({ pressed }) => [
                         styles.addButton,
                         {

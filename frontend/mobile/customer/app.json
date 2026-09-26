@@ -36,7 +36,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Ngila uses your location to show you nearby vendors, local discoveries, and relevant community updates."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

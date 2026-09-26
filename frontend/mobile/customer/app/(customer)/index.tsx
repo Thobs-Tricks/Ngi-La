@@ -20,6 +20,7 @@ import {
 } from "../../constants/theme";
 import { vendors } from "../../constants/vendor";
 import { useLocationContext } from "../../context/LocationContext";
+import { router } from "expo-router";
 
 export default function CustomerHome() {
     const [activeTab, setActiveTab] =
@@ -95,13 +96,6 @@ export default function CustomerHome() {
         );
     };
 
-    const handleAddVendor = () => {
-        showToast(
-            "Add Vendor",
-            "Vendor creation will be available here."
-        );
-    };
-
     const handleVendorTools = () => {
         showToast(
             "Vendor Tools",
@@ -145,6 +139,10 @@ export default function CustomerHome() {
         );
     };
 
+const handleAddPost = () => {
+    router.push("/(auth)/LoginScreen");
+};
+
     const renderActiveScreen = () => {
         switch (activeTab) {
             case "discover":
@@ -159,7 +157,7 @@ export default function CustomerHome() {
                 return (
                     <FeedScreen
                         theme={theme}
-                        onAddVendor={handleAddVendor}
+                        onAddPost={handleAddPost}
                     />
                 );
 
