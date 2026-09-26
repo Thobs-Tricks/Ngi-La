@@ -11,6 +11,7 @@ import {
     View,
 } from "react-native";
 import { Theme } from "../constants/theme";
+import { useLocationContext } from "../context/LocationContext";
 
 type AppHeaderProps = {
     theme: Theme;
@@ -25,6 +26,20 @@ export default function AppHeader({
     onToggleDarkMode,
     onNotifications,
 }: AppHeaderProps) {
+    const {
+        location,
+        loading,
+    } = useLocationContext();
+
+    const locationText = loading
+        ? "Locating..."
+        : location?.address.suburb &&
+          location?.address.city
+        ? `${location.address.suburb}, ${location.address.city}`
+        : location?.address.city
+        ? location.address.city
+        : "Location unavailable";
+
     return (
         <View
             style={[
@@ -87,8 +102,9 @@ export default function AppHeader({
                                             .mutedForeground,
                                 },
                             ]}
+                            numberOfLines={1}
                         >
-                            Braamfontein, JHB
+                            {locationText}
                         </Text>
                     </View>
                 </View>
@@ -188,6 +204,7 @@ const styles = StyleSheet.create({
 
     brandText: {
         justifyContent: "center",
+        flex: 1,
     },
 
     logoText: {
@@ -200,6 +217,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         marginTop: 1,
+        paddingRight: 8,
     },
 
     locationIcon: {
@@ -209,6 +227,7 @@ const styles = StyleSheet.create({
     locationText: {
         fontSize: 9,
         fontWeight: "500",
+        flexShrink: 1,
     },
 
     actions: {

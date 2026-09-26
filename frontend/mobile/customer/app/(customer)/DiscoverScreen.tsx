@@ -4,9 +4,9 @@ import {
     X,
     Map,
     List,
+    RefreshCw,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
-import * as Location from "expo-location";
+import { useMemo, useState } from "react";
 import {
     Pressable,
     ScrollView,
@@ -21,6 +21,7 @@ import {
     vendors,
 } from "../../constants/vendor";
 import { Theme } from "../../constants/theme";
+import { useLocationContext } from "../../context/LocationContext";
 import CategoryPill from "../../components/CategoryPill";
 import FilterChip from "../../components/FilterChip";
 import VendorCard from "../../components/VendorCard";
@@ -43,41 +44,28 @@ export default function DiscoverScreen({
     const [openNow, setOpenNow] = useState(false);
     const [highRating, setHighRating] = useState(false);
     const [viewMode, setViewMode] = useState<"list" | "map">("list");
-    const [userLocation, setUserLocation] = useState<{
-        latitude: number;
-        longitude: number;
-    } | null>(null);
 
-    useEffect(() => {
-        if (viewMode !== "map" || userLocation) {
-            return;
-        }
+    const {
+        location,
+        loading,
+        retryLocation,
+    } = useLocationContext();
 
-        let cancelled = false;
+    const userLocation = location
+        ? {
+              latitude: location.coordinates.latitude,
+              longitude: location.coordinates.longitude,
+          }
+        : null;
 
-        (async () => {
-            try {
-                const { status } =
-                    await Location.requestForegroundPermissionsAsync();
-                if (status !== "granted") {
-                    return;
-                }
-                const position = await Location.getCurrentPositionAsync({});
-                if (!cancelled) {
-                    setUserLocation({
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                    });
-                }
-            } catch {
-                // soft-fail - the map still works without a "you are here" pin
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [viewMode, userLocation]);
+    const locationText = loading
+        ? "Locating..."
+        : location?.address.suburb &&
+          location?.address.city
+        ? `${location.address.suburb}, ${location.address.city}`
+        : location?.address.city
+        ? location.address.city
+        : "Location unavailable";
 
     const filteredVendors = useMemo(() => {
         const distanceInMetres =
@@ -138,7 +126,20 @@ export default function DiscoverScreen({
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
         >
-            <View style={styles.locationRow}>
+            <Pressable
+                onPress={retryLocation}
+                disabled={loading}
+                style={({ pressed }) => [
+                    styles.locationRow,
+                    {
+                        opacity: loading
+                            ? 0.6
+                            : pressed
+                            ? 0.7
+                            : 1,
+                    },
+                ]}
+            >
                 <MapPin
                     size={22}
                     strokeWidth={2}
@@ -146,7 +147,7 @@ export default function DiscoverScreen({
                     style={styles.locationIcon}
                 />
 
-                <View>
+                <View style={styles.locationContent}>
                     <Text
                         style={[
                             styles.locationLabel,
@@ -168,10 +169,16 @@ export default function DiscoverScreen({
                             },
                         ]}
                     >
-                        Braamfontein, JHB
+                        {locationText}
                     </Text>
                 </View>
-            </View>
+
+                <RefreshCw
+                    size={17}
+                    strokeWidth={2}
+                    color={theme.colors.mutedForeground}
+                />
+            </Pressable>
 
             <Text
                 style={[
@@ -298,70 +305,70 @@ export default function DiscoverScreen({
                 />
             </ScrollView>
 
-<View style={styles.resultsHeader}>
-    <Text
-        style={[
-            styles.resultsCount,
-            {
-                color: theme.colors.foreground,
-            },
-        ]}
-    >
-        {filteredVendors.length}{" "}
-        {filteredVendors.length === 1
-            ? "vendor"
-            : "vendors"}{" "}
-        found
-    </Text>
+            <View style={styles.resultsHeader}>
+                <Text
+                    style={[
+                        styles.resultsCount,
+                        {
+                            color: theme.colors.foreground,
+                        },
+                    ]}
+                >
+                    {filteredVendors.length}{" "}
+                    {filteredVendors.length === 1
+                        ? "vendor"
+                        : "vendors"}{" "}
+                    found
+                </Text>
 
-    <Pressable
-        onPress={() =>
-            setViewMode((mode) => (mode === "list" ? "map" : "list"))
-        }
-        style={({ pressed }) => [
-            styles.mapButton,
-            {
-                borderColor:
-                    viewMode === "map"
-                        ? theme.colors.primary
-                        : theme.colors.border,
-                backgroundColor:
-                    viewMode === "map"
-                        ? theme.colors.primary
-                        : theme.colors.card,
-                opacity: pressed ? 0.7 : 1,
-            },
-        ]}
-    >
-        {viewMode === "map" ? (
-            <List
-                size={15}
-                strokeWidth={2}
-                color={theme.colors.primaryForeground}
-            />
-        ) : (
-            <Map
-                size={15}
-                strokeWidth={2}
-                color={theme.colors.foreground}
-            />
-        )}
+                <Pressable
+                    onPress={() =>
+                        setViewMode((mode) => (mode === "list" ? "map" : "list"))
+                    }
+                    style={({ pressed }) => [
+                        styles.mapButton,
+                        {
+                            borderColor:
+                                viewMode === "map"
+                                    ? theme.colors.primary
+                                    : theme.colors.border,
+                            backgroundColor:
+                                viewMode === "map"
+                                    ? theme.colors.primary
+                                    : theme.colors.card,
+                            opacity: pressed ? 0.7 : 1,
+                        },
+                    ]}
+                >
+                    {viewMode === "map" ? (
+                        <List
+                            size={15}
+                            strokeWidth={2}
+                            color={theme.colors.primaryForeground}
+                        />
+                    ) : (
+                        <Map
+                            size={15}
+                            strokeWidth={2}
+                            color={theme.colors.foreground}
+                        />
+                    )}
 
-        <Text
-            style={[
-                styles.mapButtonText,
-                {
-                    color:
-                        viewMode === "map"
-                            ? theme.colors.primaryForeground
-                            : theme.colors.foreground,
-                },
-            ]}
-        >
-            {viewMode === "map" ? "Show List" : "Toggle Map"}
-        </Text>
-    </Pressable>
-</View>
+                    <Text
+                        style={[
+                            styles.mapButtonText,
+                            {
+                                color:
+                                    viewMode === "map"
+                                        ? theme.colors.primaryForeground
+                                        : theme.colors.foreground,
+                            },
+                        ]}
+                    >
+                        {viewMode === "map" ? "Show List" : "Toggle Map"}
+                    </Text>
+                </Pressable>
+            </View>
 
             {viewMode === "map" ? (
                 <View style={styles.mapView}>
@@ -447,6 +454,10 @@ const styles = StyleSheet.create({
         marginRight: 9,
     },
 
+    locationContent: {
+        flex: 1,
+    },
+
     locationLabel: {
         fontSize: 10,
         marginBottom: 2,
@@ -520,15 +531,15 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
-mapButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-},
+    mapButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+    },
 
     mapButtonText: {
         fontSize: 11,

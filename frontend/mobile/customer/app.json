@@ -8,7 +8,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ngila uses your location to show you nearby vendors, local discoveries, and relevant community updates."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +20,11 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,9 +34,10 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Ngila uses your location to show nearby vendors on the map and get you directions."
+          "locationAlwaysAndWhenInUsePermission": "Ngila uses your location to show you nearby vendors, local discoveries, and relevant community updates."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

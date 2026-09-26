@@ -20,6 +20,8 @@ import HowNgilaWorks from "../../components/HowNgilaWorks";
 import MoreOption from "../../components/MoreOption";
 import ProfileCard from "../../components/ProfileCard";
 import { Theme } from "../../constants/theme";
+import { useAuth } from "../../context/AuthContext";
+import { getInitials } from "../../utils/auth";
 
 type MoreScreenProps = {
     theme: Theme;
@@ -38,6 +40,19 @@ export default function MoreScreen({
     onHowNgilaWorks,
     onAboutNgila,
 }: MoreScreenProps) {
+    const { user } = useAuth();
+
+    const userName = user
+        ? `${user.firstName} ${user.lastName}`
+        : "Loading...";
+
+    const userInitials = user
+        ? getInitials(
+              user.firstName,
+              user.lastName
+          )
+        : "";
+
     return (
         <ScrollView
             style={[
@@ -76,10 +91,10 @@ export default function MoreScreen({
             </View>
 
             <ProfileCard
-                name="Nomvelo Mokoena"
+                name={userName}
                 role="Community Scout"
                 listings={34}
-                initials="NM"
+                initials={userInitials}
                 theme={theme}
             />
 

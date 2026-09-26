@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import * as Location from "expo-location";
 import HomeScreen from "./HomeScreen";
 import DiscoverScreen from "./DiscoverScreen";
 import FeedScreen from "./FeedScreen";
@@ -13,12 +12,16 @@ import BottomNavigation, {
 import VendorDetailSheet from "../../components/VendorDetailSheet";
 import DirectionsSheet from "../../components/DirectionsSheet";
 import Toast from "../../components/Toast";
+import LocationPermissionModal from "../../components/LocationPermissionModal";
+import LocationServicesModal from "../../components/LocationServicesModal";
 import {
     defaultTheme,
     ThemeMode,
     themes,
 } from "../../constants/theme";
 import { vendors } from "../../constants/vendor";
+import { useLocationContext } from "../../context/LocationContext";
+import { router } from "expo-router";
 
 export default function CustomerHome() {
     const [activeTab, setActiveTab] =
@@ -33,11 +36,6 @@ export default function CustomerHome() {
     const [directionsVendorId, setDirectionsVendorId] =
         useState<number | null>(null);
 
-    const [userLocation, setUserLocation] = useState<{
-        latitude: number;
-        longitude: number;
-    } | null>(null);
-
     const [toastVisible, setToastVisible] =
         useState(false);
 
@@ -48,6 +46,20 @@ export default function CustomerHome() {
         useState("");
 
     const theme = themes[themeMode];
+
+    const {
+        location,
+        permissionStatus,
+        servicesEnabled,
+        retryLocation,
+    } = useLocationContext();
+
+    const userLocation = location
+        ? {
+              latitude: location.coordinates.latitude,
+              longitude: location.coordinates.longitude,
+          }
+        : null;
 
     const selectedVendor =
         vendors.find(
@@ -101,13 +113,6 @@ export default function CustomerHome() {
         );
     };
 
-    const handleAddVendor = () => {
-        showToast(
-            "Add Vendor",
-            "Vendor creation will be available here."
-        );
-    };
-
     const handleVendorTools = () => {
         showToast(
             "Vendor Tools",
@@ -129,38 +134,18 @@ export default function CustomerHome() {
         );
     };
 
-    const handleDirections = async () => {
+    const handleDirections = () => {
         if (!selectedVendor) {
             return;
         }
 
-        const vendorId = selectedVendor.id;
         setSelectedVendorId(null);
-        setDirectionsVendorId(vendorId);
+        setDirectionsVendorId(selectedVendor.id);
 
-        if (userLocation) {
-            return;
-        }
-
-        try {
-            const { status } =
-                await Location.requestForegroundPermissionsAsync();
-            if (status !== "granted") {
-                showToast(
-                    "Location needed",
-                    "Enable location access to see distance and route."
-                );
-                return;
-            }
-            const position = await Location.getCurrentPositionAsync({});
-            setUserLocation({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-            });
-        } catch {
+        if (!userLocation) {
             showToast(
-                "Couldn't get your location",
-                "You can still open this vendor in your maps app."
+                "Still locating you",
+                "Distance and route will appear once your location is ready."
             );
         }
     };
@@ -180,6 +165,10 @@ export default function CustomerHome() {
         );
     };
 
+const handleAddPost = () => {
+    router.push("/(auth)/LoginScreen");
+};
+
     const renderActiveScreen = () => {
         switch (activeTab) {
             case "discover":
@@ -194,7 +183,7 @@ export default function CustomerHome() {
                 return (
                     <FeedScreen
                         theme={theme}
-                        onAddVendor={handleAddVendor}
+                        onAddPost={handleAddPost}
                     />
                 );
 
@@ -210,16 +199,26 @@ export default function CustomerHome() {
                     />
                 );
 
-            case "home":
-            default:
-                return (
-                    <HomeScreen
-                        theme={theme}
-                        onVendorPress={handleVendorPress}
-                    />
-                );
+                case "home":
+                default:
+                    return (
+                        <HomeScreen
+                            theme={theme}
+                            onVendorPress={handleVendorPress}
+                            onExploreVendors={() =>
+                                setActiveTab("discover")
+                            }
+                        />
+                    );
         }
     };
+
+    const permissionModalVisible =
+        permissionStatus !== "granted";
+
+    const servicesModalVisible =
+        permissionStatus === "granted" &&
+        servicesEnabled === false;
 
     return (
         <View
@@ -277,6 +276,18 @@ export default function CustomerHome() {
                 title={toastTitle}
                 description={toastDescription}
                 theme={theme}
+            />
+
+            <LocationPermissionModal
+                theme={theme}
+                visible={permissionModalVisible}
+                onAllowLocation={retryLocation}
+            />
+
+            <LocationServicesModal
+                theme={theme}
+                visible={servicesModalVisible}
+                onRetry={retryLocation}
             />
         </View>
     );

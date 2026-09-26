@@ -10,8 +10,8 @@ import {
     Text,
     View,
 } from "react-native";
-import { FeedItem } from "../constants/feed";
 import { Theme } from "../constants/theme";
+import { FeedItem } from "../types/feed";
 
 type FeedPostProps = {
     item: FeedItem;

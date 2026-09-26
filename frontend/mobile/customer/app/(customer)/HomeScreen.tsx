@@ -1,4 +1,7 @@
 import {
+    ArrowRight,
+} from "lucide-react-native";
+import {
     Pressable,
     ScrollView,
     StyleSheet,
@@ -13,11 +16,13 @@ import VendorCard from "../../components/VendorCard";
 type HomeScreenProps = {
     theme: Theme;
     onVendorPress: (vendorId: number) => void;
+    onExploreVendors: () => void;
 };
 
 export default function HomeScreen({
     theme,
     onVendorPress,
+    onExploreVendors,
 }: HomeScreenProps) {
     return (
         <ScrollView
@@ -37,8 +42,7 @@ export default function HomeScreen({
                         backgroundColor: theme.colors.primary,
                     },
                 ]}
-            >                
-
+            >
                 <Text
                     style={[
                         styles.heroTitle,
@@ -66,14 +70,15 @@ export default function HomeScreen({
                 </Text>
 
                 <Pressable
-                    style={[
+                    style={({ pressed }) => [
                         styles.heroButton,
                         {
                             backgroundColor:
                                 theme.colors.primaryForeground,
+                            opacity: pressed ? 0.85 : 1,
                         },
                     ]}
-                    onPress={() => {}}
+                    onPress={onExploreVendors}
                 >
                     <Text
                         style={[
@@ -85,29 +90,12 @@ export default function HomeScreen({
                     >
                         Explore vendors near you
                     </Text>
-                </Pressable>
 
-                <Pressable
-                    style={[
-                        styles.vendorButton,
-                        {
-                            borderColor:
-                                theme.colors.primaryForeground,
-                        },
-                    ]}
-                    onPress={() => {}}
-                >
-                    <Text
-                        style={[
-                            styles.vendorButtonText,
-                            {
-                                color:
-                                    theme.colors.primaryForeground,
-                            },
-                        ]}
-                    >
-                        I'm a vendor
-                    </Text>
+                    <ArrowRight
+                        size={18}
+                        strokeWidth={2.5}
+                        color={theme.colors.primary}
+                    />
                 </Pressable>
             </View>
 
@@ -169,7 +157,7 @@ export default function HomeScreen({
                         }
                     />
                 ))}
-            </View>         
+            </View>
 
             <View style={styles.bottomSpacing} />
         </ScrollView>
@@ -213,29 +201,18 @@ const styles = StyleSheet.create({
     },
 
     heroButton: {
-        height: 44,
+        minHeight: 46,
         borderRadius: 10,
+        flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        marginBottom: 9,
+        gap: 8,
+        paddingHorizontal: 14,
     },
 
     heroButtonText: {
         fontSize: 13,
         fontWeight: "700",
-    },
-
-    vendorButton: {
-        height: 44,
-        borderWidth: 1,
-        borderRadius: 10,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    vendorButtonText: {
-        fontSize: 13,
-        fontWeight: "600",
     },
 
     stats: {
