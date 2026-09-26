@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using System.Threading.RateLimiting;
 using FluentValidation;
@@ -177,6 +178,13 @@ builder.Services.AddSwaggerGen(options =>
     {
         { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } }, Array.Empty<string>() }
     });
+
+    // Surfaces every <summary> doc comment on controllers/actions as the endpoint's description
+    // in Swagger UI - the project builds this file (see GenerateDocumentationFile in the
+    // .csproj), but nothing was ever telling Swashbuckle to read it.
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{Assembly.GetExecutingAssembly().GetName().Name}.xml");
+    if (File.Exists(xmlPath))
+        options.IncludeXmlComments(xmlPath);
 });
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>

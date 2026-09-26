@@ -5,6 +5,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>fafa4150-35ec-4577-a939-15c1e7890064</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591 is "missing XML comment for publicly visible member" - most actions/DTOs don't
+         have one, and that's fine (Swagger just falls back to no description for those); this
+         only needs to warn as a build error if left un-suppressed, which it shouldn't. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
