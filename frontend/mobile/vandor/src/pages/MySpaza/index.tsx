@@ -14,10 +14,14 @@ import TradingHoursEditor, { DEFAULT_TRADING_HOURS, DayHours } from '../../compo
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../styles/theme';
 import { getCategories } from '../../api/categories';
+import { getMyProfile, upsertMyProfile } from '../../api/vendors';
+import { uploadNewImages } from '../../api/media';
+import { ApiError } from '../../api/client';
 import type { Category } from '../../types';
 import type { MySpazaStackParamList } from '../../router/types';
 
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+const MAX_PROMO_PHOTOS = 5;
 
 function staticMapUrl(lat: number, lng: number, color: string) {
   const hex = color.replace('#', '0x');
@@ -29,6 +33,10 @@ export default function MySpazaScreen() {
   const route = useRoute<RouteProp<MySpazaStackParamList, 'MySpazaForm'>>();
   const { session } = useAuth();
   const colors = useThemeColors();
+  const accessToken = session?.accessToken;
+
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [hasProfile, setHasProfile] = useState(false);
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState('');
@@ -48,6 +56,7 @@ export default function MySpazaScreen() {
   const [promoPhotos, setPromoPhotos] = useState<string[]>([]);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoSaved, setPromoSaved] = useState(false);
+  const [isSavingPromo, setIsSavingPromo] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +75,57 @@ export default function MySpazaScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pre-fills the form from the vendor's existing profile, if they already set one up -
+  // otherwise this is a blank "first time" form.
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await getMyProfile(accessToken);
+        if (cancelled || !profile) return;
+
+        setHasProfile(true);
+        setBusinessName(profile.name);
+        setDescription(profile.description ?? '');
+        setLocationDescription(profile.locationDescription);
+        setContactPhone(profile.phone ?? '');
+        setImageUri(profile.image);
+        setPromoPhotos(profile.photos);
+        if (profile.latitude != null && profile.longitude != null) {
+          setCoords({ lat: profile.latitude, lng: profile.longitude });
+        }
+        if (profile.tradingHours.length > 0) {
+          // A closed day has null open/close times from the API - the editor still needs some
+          // string to show if the vendor flips it back open, so default to a sensible 08:00-18:00.
+          setTradingHours(
+            profile.tradingHours.map((h) => ({
+              day: h.day,
+              isOpen: h.isOpen,
+              openTime: h.openTime ?? '08:00',
+              closeTime: h.closeTime ?? '18:00',
+            }))
+          );
+        }
+        setSelectedCategoryIds(
+          categories.length > 0
+            ? categories.filter((c) => profile.categories.includes(c.name)).map((c) => c.id)
+            : []
+        );
+        setSaved(true);
+      } catch {
+        // Soft-fail - the vendor just sees a blank "set up your spaza" form instead.
+      } finally {
+        if (!cancelled) setIsLoadingProfile(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Waits for categories so profile.categories (names) can be matched back to ids.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, categories.length]);
 
   // Picks up the pin dropped on the MapPicker screen when it navigates back
   // here with new params.
@@ -111,7 +171,39 @@ export default function MySpazaScreen() {
     }
   };
 
-  const handleSave = () => {
+  // Shared by both "Save Spaza" and "Save Promo Photos": the API takes the whole profile in one
+  // PUT, so anything editable on this screen (categories, hours, both photo sets) gets sent
+  // every time, not just the fields the button visually sits next to.
+  const saveProfile = async () => {
+    if (!accessToken) throw new ApiError('Your session has expired — please log in again.', 401);
+
+    const [uploadedImage] = imageUri ? await uploadNewImages([imageUri], accessToken) : [null];
+    const uploadedPromoPhotos = await uploadNewImages(promoPhotos, accessToken);
+
+    const profile = await upsertMyProfile(
+      {
+        businessName: businessName.trim(),
+        description: description.trim() || null,
+        categoryIds: selectedCategoryIds,
+        locationDescription: locationDescription.trim(),
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
+        contactPhone: contactPhone.trim() || null,
+        tradingHours,
+        imageUrl: uploadedImage,
+        photoUrls: uploadedPromoPhotos,
+      },
+      accessToken
+    );
+
+    // Reflect back whatever Cloudinary/the API actually stored (e.g. the uploaded URLs), so a
+    // second save doesn't re-upload photos that are already hosted.
+    setImageUri(profile.image);
+    setPromoPhotos(profile.photos);
+    setHasProfile(true);
+  };
+
+  const handleSave = async () => {
     setFormError(null);
 
     if (!businessName.trim()) {
@@ -132,15 +224,15 @@ export default function MySpazaScreen() {
     }
 
     setIsSaving(true);
-    // No live create/update endpoint yet — this is UI-only for now, so we
-    // just simulate the round trip and show the confirmation.
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      await saveProfile();
       setSaved(true);
-    }, 700);
+    } catch (e) {
+      setFormError(e instanceof ApiError ? e.message : "Couldn't save your spaza. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
-
-  const MAX_PROMO_PHOTOS = 5;
 
   const pickPromoPhoto = async () => {
     if (promoPhotos.length >= MAX_PROMO_PHOTOS) return;
@@ -166,15 +258,31 @@ export default function MySpazaScreen() {
     setPromoSaved(false);
   };
 
-  const handleSavePromo = () => {
+  const handleSavePromo = async () => {
     if (promoPhotos.length === 0) {
       setPromoError('Add at least one photo to save your promo gallery.');
       return;
     }
     setPromoError(null);
-    // UI-only for now, same as the spaza profile save above.
-    setPromoSaved(true);
+    setIsSavingPromo(true);
+    try {
+      await saveProfile();
+      setPromoSaved(true);
+    } catch (e) {
+      setPromoError(e instanceof ApiError ? e.message : "Couldn't save your photos. Please try again.");
+    } finally {
+      setIsSavingPromo(false);
+    }
   };
+
+  if (isLoadingProfile) {
+    return (
+      <ScreenContainer className="items-center justify-center">
+        <AppStatusBar />
+        <ActivityIndicator color={colors.primary} />
+      </ScreenContainer>
+    );
+  }
 
   if (saved) {
     const selectedCategoryNames = categories
@@ -189,9 +297,11 @@ export default function MySpazaScreen() {
           <View className="h-14 w-14 items-center justify-center rounded-full bg-verified/10">
             <Feather name="check" size={24} color={colors.verified} />
           </View>
-          <Text className="mt-4 text-xl font-semibold text-foreground">Your spaza profile is ready</Text>
+          <Text className="mt-4 text-xl font-semibold text-foreground">
+            {hasProfile ? 'Your spaza profile' : 'Your spaza profile is ready'}
+          </Text>
           <Text className="mt-1.5 text-center text-sm leading-5 text-muted-foreground">
-            We'll publish this the moment spaza profiles go live on the backend.
+            {hasProfile ? 'Customers can find you on Ngila.' : "You're now listed on Ngila."}
           </Text>
         </View>
 
@@ -261,8 +371,14 @@ export default function MySpazaScreen() {
             {promoSaved && !promoError && (
               <Text className="text-xs font-medium text-verified">Saved</Text>
             )}
-            <Pressable onPress={handleSavePromo} className="rounded-full bg-primary px-4 py-2">
-              <Text className="text-xs font-semibold text-primary-foreground">Save Promo Photos</Text>
+            <Pressable
+              onPress={handleSavePromo}
+              disabled={isSavingPromo}
+              className="rounded-full bg-primary px-4 py-2 disabled:opacity-60"
+            >
+              <Text className="text-xs font-semibold text-primary-foreground">
+                {isSavingPromo ? 'Saving…' : 'Save Promo Photos'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -271,7 +387,8 @@ export default function MySpazaScreen() {
           Trading Hours
         </Text>
         <Text className="mb-3 text-sm text-muted-foreground">
-          Let customers know when you're open. Toggle a day off if you don't trade then.
+          Let customers know when you're open. Toggle a day off if you don't trade then. Changes
+          here are saved along with your promo photos above.
         </Text>
         <TradingHoursEditor hours={tradingHours} onChange={setTradingHours} />
 
