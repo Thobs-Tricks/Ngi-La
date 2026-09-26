@@ -4,7 +4,6 @@ import { Theme } from "../constants/theme";
 type ProfileCardProps = {
     name: string;
     role: string;
-    listings: number;
     initials: string;
     theme: Theme;
 };
@@ -12,7 +11,6 @@ type ProfileCardProps = {
 export default function ProfileCard({
     name,
     role,
-    listings,
     initials,
     theme,
 }: ProfileCardProps) {
@@ -67,17 +65,6 @@ export default function ProfileCard({
                     ]}
                 >
                     {role}
-                </Text>
-
-                <Text
-                    style={[
-                        styles.listings,
-                        {
-                            color: theme.colors.foreground,
-                        },
-                    ]}
-                >
-                    {listings} Listings Added
                 </Text>
             </View>
         </View>

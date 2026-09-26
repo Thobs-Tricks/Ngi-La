@@ -1,5 +1,6 @@
 import {
     ArrowRight,
+    RefreshCw,
 } from "lucide-react-native";
 import {
     Pressable,
@@ -8,14 +9,14 @@ import {
     Text,
     View,
 } from "react-native";
-import { vendors } from "../../constants/vendor";
 import { Theme } from "../../constants/theme";
 import StatCard from "../../components/StatCard";
 import VendorCard from "../../components/VendorCard";
+import useVendors from "../../hooks/useVendors";
 
 type HomeScreenProps = {
     theme: Theme;
-    onVendorPress: (vendorId: number) => void;
+    onVendorPress: (vendorId: string) => void;
     onExploreVendors: () => void;
 };
 
@@ -24,12 +25,22 @@ export default function HomeScreen({
     onVendorPress,
     onExploreVendors,
 }: HomeScreenProps) {
+    const {
+        vendors,
+        loading,
+        error,
+        refresh,
+    } = useVendors();
+
+    const nearbyVendors = vendors.slice(0, 3);
+
     return (
         <ScrollView
             style={[
                 styles.container,
                 {
-                    backgroundColor: theme.colors.background,
+                    backgroundColor:
+                        theme.colors.background,
                 },
             ]}
             contentContainerStyle={styles.content}
@@ -39,7 +50,8 @@ export default function HomeScreen({
                 style={[
                     styles.hero,
                     {
-                        backgroundColor: theme.colors.primary,
+                        backgroundColor:
+                            theme.colors.primary,
                     },
                 ]}
             >
@@ -48,7 +60,8 @@ export default function HomeScreen({
                         styles.heroTitle,
                         {
                             color:
-                                theme.colors.primaryForeground,
+                                theme.colors
+                                    .primaryForeground,
                         },
                     ]}
                 >
@@ -60,13 +73,14 @@ export default function HomeScreen({
                         styles.heroDescription,
                         {
                             color:
-                                theme.colors.primaryForeground,
+                                theme.colors
+                                    .primaryForeground,
                         },
                     ]}
                 >
-                    Find local vendors, discover hidden gems and
-                    support the people who keep your community
-                    moving.
+                    Find local vendors, discover hidden gems
+                    and support the people who keep your
+                    community moving.
                 </Text>
 
                 <Pressable
@@ -74,7 +88,8 @@ export default function HomeScreen({
                         styles.heroButton,
                         {
                             backgroundColor:
-                                theme.colors.primaryForeground,
+                                theme.colors
+                                    .primaryForeground,
                             opacity: pressed ? 0.85 : 1,
                         },
                     ]}
@@ -84,7 +99,8 @@ export default function HomeScreen({
                         style={[
                             styles.heroButtonText,
                             {
-                                color: theme.colors.primary,
+                                color:
+                                    theme.colors.primary,
                             },
                         ]}
                     >
@@ -97,27 +113,7 @@ export default function HomeScreen({
                         color={theme.colors.primary}
                     />
                 </Pressable>
-            </View>
-
-            <View style={styles.stats}>
-                <StatCard
-                    value="2.5k+"
-                    label="Vendors mapped"
-                    theme={theme}
-                />
-
-                <StatCard
-                    value="18k"
-                    label="Community reviews"
-                    theme={theme}
-                />
-
-                <StatCard
-                    value="9"
-                    label="Townships live"
-                    theme={theme}
-                />
-            </View>
+            </View>           
 
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -125,20 +121,24 @@ export default function HomeScreen({
                         style={[
                             styles.sectionTitle,
                             {
-                                color: theme.colors.foreground,
+                                color:
+                                    theme.colors.foreground,
                             },
                         ]}
                     >
                         Around you right now
                     </Text>
 
-                    <Pressable>
+                    <Pressable
+                        onPress={onExploreVendors}
+                    >
                         <Text
                             style={[
                                 styles.seeAll,
                                 {
-                                    color: theme.colors
-                                        .mutedForeground,
+                                    color:
+                                        theme.colors
+                                            .mutedForeground,
                                 },
                             ]}
                         >
@@ -147,16 +147,170 @@ export default function HomeScreen({
                     </Pressable>
                 </View>
 
-                {vendors.slice(0, 3).map((vendor) => (
-                    <VendorCard
-                        key={vendor.id}
-                        vendor={vendor}
-                        theme={theme}
-                        onPress={() =>
-                            onVendorPress(vendor.id)
-                        }
-                    />
-                ))}
+                {loading ? (
+                    <View
+                        style={[
+                            styles.stateContainer,
+                            {
+                                backgroundColor:
+                                    theme.colors.card,
+                                borderColor:
+                                    theme.colors.border,
+                            },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                styles.stateTitle,
+                                {
+                                    color:
+                                        theme.colors
+                                            .foreground,
+                                },
+                            ]}
+                        >
+                            Loading vendors...
+                        </Text>
+
+                        <Text
+                            style={[
+                                styles.stateDescription,
+                                {
+                                    color:
+                                        theme.colors
+                                            .mutedForeground,
+                                },
+                            ]}
+                        >
+                            Finding vendors near you.
+                        </Text>
+                    </View>
+                ) : error ? (
+                    <View
+                        style={[
+                            styles.stateContainer,
+                            {
+                                backgroundColor:
+                                    theme.colors.card,
+                                borderColor:
+                                    theme.colors.border,
+                            },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                styles.stateTitle,
+                                {
+                                    color:
+                                        theme.colors
+                                            .foreground,
+                                },
+                            ]}
+                        >
+                            Unable to load vendors
+                        </Text>
+
+                        <Text
+                            style={[
+                                styles.stateDescription,
+                                {
+                                    color:
+                                        theme.colors
+                                            .mutedForeground,
+                                },
+                            ]}
+                        >
+                            {error}
+                        </Text>
+
+                        <Pressable
+                            onPress={refresh}
+                            style={({ pressed }) => [
+                                styles.retryButton,
+                                {
+                                    backgroundColor:
+                                        theme.colors
+                                            .primary,
+                                    opacity: pressed
+                                        ? 0.8
+                                        : 1,
+                                },
+                            ]}
+                        >
+                            <RefreshCw
+                                size={15}
+                                strokeWidth={2}
+                                color={
+                                    theme.colors
+                                        .primaryForeground
+                                }
+                            />
+
+                            <Text
+                                style={[
+                                    styles.retryButtonText,
+                                    {
+                                        color:
+                                            theme.colors
+                                                .primaryForeground,
+                                    },
+                                ]}
+                            >
+                                Retry
+                            </Text>
+                        </Pressable>
+                    </View>
+                ) : nearbyVendors.length > 0 ? (
+                    nearbyVendors.map((vendor) => (
+                        <VendorCard
+                            key={vendor.id}
+                            vendor={vendor}
+                            theme={theme}
+                            onPress={() =>
+                                onVendorPress(vendor.id)
+                            }
+                        />
+                    ))
+                ) : (
+                    <View
+                        style={[
+                            styles.stateContainer,
+                            {
+                                backgroundColor:
+                                    theme.colors.card,
+                                borderColor:
+                                    theme.colors.border,
+                            },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                styles.stateTitle,
+                                {
+                                    color:
+                                        theme.colors
+                                            .foreground,
+                                },
+                            ]}
+                        >
+                            No vendors found
+                        </Text>
+
+                        <Text
+                            style={[
+                                styles.stateDescription,
+                                {
+                                    color:
+                                        theme.colors
+                                            .mutedForeground,
+                                },
+                            ]}
+                        >
+                            There are no vendors available
+                            right now.
+                        </Text>
+                    </View>
+                )}
             </View>
 
             <View style={styles.bottomSpacing} />
@@ -240,6 +394,41 @@ const styles = StyleSheet.create({
     seeAll: {
         fontSize: 12,
         fontWeight: "500",
+    },
+
+    stateContainer: {
+        borderWidth: 1,
+        borderRadius: 14,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 32,
+        paddingHorizontal: 20,
+    },
+
+    stateTitle: {
+        fontSize: 15,
+        fontWeight: "700",
+        marginBottom: 6,
+    },
+
+    stateDescription: {
+        fontSize: 12,
+        textAlign: "center",
+    },
+
+    retryButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginTop: 14,
+    },
+
+    retryButtonText: {
+        fontSize: 12,
+        fontWeight: "600",
     },
 
     bottomSpacing: {

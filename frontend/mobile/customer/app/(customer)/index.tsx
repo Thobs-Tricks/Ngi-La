@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { router } from "expo-router";
 import HomeScreen from "./HomeScreen";
 import DiscoverScreen from "./DiscoverScreen";
 import FeedScreen from "./FeedScreen";
@@ -18,9 +19,8 @@ import {
     ThemeMode,
     themes,
 } from "../../constants/theme";
-import { vendors } from "../../constants/vendor";
 import { useLocationContext } from "../../context/LocationContext";
-import { router } from "expo-router";
+import useVendors from "../../hooks/useVendors";
 
 export default function CustomerHome() {
     const [activeTab, setActiveTab] =
@@ -30,7 +30,7 @@ export default function CustomerHome() {
         useState<ThemeMode>(defaultTheme);
 
     const [selectedVendorId, setSelectedVendorId] =
-        useState<number | null>(null);
+        useState<string | null>(null);
 
     const [toastVisible, setToastVisible] =
         useState(false);
@@ -48,6 +48,10 @@ export default function CustomerHome() {
         servicesEnabled,
         retryLocation,
     } = useLocationContext();
+
+    const {
+        vendors,
+    } = useVendors();
 
     const selectedVendor =
         vendors.find(
@@ -75,7 +79,7 @@ export default function CustomerHome() {
         setToastVisible(true);
     };
 
-    const handleVendorPress = (vendorId: number) => {
+    const handleVendorPress = (vendorId: string) => {
         setSelectedVendorId(vendorId);
     };
 
@@ -139,9 +143,9 @@ export default function CustomerHome() {
         );
     };
 
-const handleAddPost = () => {
-    router.push("/(auth)/LoginScreen");
-};
+    const handleAddPost = () => {
+        router.push("/(auth)/LoginScreen");
+    };
 
     const renderActiveScreen = () => {
         switch (activeTab) {
@@ -166,24 +170,28 @@ const handleAddPost = () => {
                     <MoreScreen
                         theme={theme}
                         isDarkMode={themeMode === "dark"}
-                        onToggleDarkMode={handleToggleDarkMode}
+                        onToggleDarkMode={
+                            handleToggleDarkMode
+                        }
                         onVendorTools={handleVendorTools}
-                        onHowNgilaWorks={handleHowNgilaWorks}
+                        onHowNgilaWorks={
+                            handleHowNgilaWorks
+                        }
                         onAboutNgila={handleAboutNgila}
                     />
                 );
 
-                case "home":
-                default:
-                    return (
-                        <HomeScreen
-                            theme={theme}
-                            onVendorPress={handleVendorPress}
-                            onExploreVendors={() =>
-                                setActiveTab("discover")
-                            }
-                        />
-                    );
+            case "home":
+            default:
+                return (
+                    <HomeScreen
+                        theme={theme}
+                        onVendorPress={handleVendorPress}
+                        onExploreVendors={() =>
+                            setActiveTab("discover")
+                        }
+                    />
+                );
         }
     };
 
@@ -199,7 +207,8 @@ const handleAddPost = () => {
             style={[
                 styles.container,
                 {
-                    backgroundColor: theme.colors.background,
+                    backgroundColor:
+                        theme.colors.background,
                 },
             ]}
         >
@@ -214,7 +223,9 @@ const handleAddPost = () => {
             <AppHeader
                 theme={theme}
                 isDarkMode={themeMode === "dark"}
-                onToggleDarkMode={handleToggleDarkMode}
+                onToggleDarkMode={
+                    handleToggleDarkMode
+                }
                 onNotifications={handleNotifications}
             />
 

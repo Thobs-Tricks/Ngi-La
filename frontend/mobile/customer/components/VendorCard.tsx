@@ -10,7 +10,7 @@ import {
     View,
 } from "react-native";
 import { Theme } from "../constants/theme";
-import { Vendor } from "../constants/vendor";
+import { Vendor } from "../types/vendor";
 
 type VendorCardProps = {
     vendor: Vendor;
@@ -28,6 +28,11 @@ export default function VendorCard({
             ? `${vendor.distance} m`
             : `${(vendor.distance / 1000).toFixed(1)} km`;
 
+    const category =
+        vendor.categories.length > 0
+            ? vendor.categories.join(" • ")
+            : "Uncategorized";
+
     return (
         <Pressable
             onPress={onPress}
@@ -40,10 +45,27 @@ export default function VendorCard({
                 },
             ]}
         >
-            <Image
-                source={{ uri: vendor.image }}
-                style={styles.image}
-            />
+            {vendor.image ? (
+                <Image
+                    source={{ uri: vendor.image }}
+                    style={styles.image}
+                />
+            ) : (
+                <View
+                    style={[
+                        styles.image,
+                        styles.imagePlaceholder,
+                        {
+                            backgroundColor:
+                                theme.colors.muted,
+                        },
+                    ]}
+                >
+                    <MapPinPlaceholder
+                        color={theme.colors.mutedForeground}
+                    />
+                </View>
+            )}
 
             <View style={styles.content}>
                 <View style={styles.titleRow}>
@@ -82,14 +104,16 @@ export default function VendorCard({
                 </View>
 
                 <Text
+                    numberOfLines={1}
                     style={[
                         styles.category,
                         {
-                            color: theme.colors.mutedForeground,
+                            color: theme.colors
+                                .mutedForeground,
                         },
                     ]}
                 >
-                    {vendor.category}
+                    {category}
                 </Text>
 
                 <View style={styles.detailsRow}>
@@ -97,7 +121,8 @@ export default function VendorCard({
                         style={[
                             styles.detail,
                             {
-                                color: theme.colors.mutedForeground,
+                                color: theme.colors
+                                    .mutedForeground,
                             },
                         ]}
                     >
@@ -127,7 +152,8 @@ export default function VendorCard({
                             style={[
                                 styles.rating,
                                 {
-                                    color: theme.colors.foreground,
+                                    color: theme.colors
+                                        .foreground,
                                 },
                             ]}
                         >
@@ -139,7 +165,8 @@ export default function VendorCard({
                         style={[
                             styles.reviews,
                             {
-                                color: theme.colors.mutedForeground,
+                                color: theme.colors
+                                    .mutedForeground,
                             },
                         ]}
                     >
@@ -152,9 +179,12 @@ export default function VendorCard({
                         style={[
                             styles.statusDot,
                             {
-                                backgroundColor: vendor.isOpen
-                                    ? theme.colors.success
-                                    : theme.colors.mutedForeground,
+                                backgroundColor:
+                                    vendor.isOpen
+                                        ? theme.colors
+                                              .success
+                                        : theme.colors
+                                              .mutedForeground,
                             },
                         ]}
                     />
@@ -165,15 +195,35 @@ export default function VendorCard({
                             {
                                 color: vendor.isOpen
                                     ? theme.colors.success
-                                    : theme.colors.mutedForeground,
+                                    : theme.colors
+                                          .mutedForeground,
                             },
                         ]}
                     >
-                        {vendor.isOpen ? "Open now" : "Closed"}
+                        {vendor.isOpen
+                            ? "Open now"
+                            : "Closed"}
                     </Text>
                 </View>
             </View>
         </Pressable>
+    );
+}
+
+function MapPinPlaceholder({
+    color,
+}: {
+    color: string;
+}) {
+    return (
+        <View
+            style={[
+                styles.placeholderIcon,
+                {
+                    borderColor: color,
+                },
+            ]}
+        />
     );
 }
 
@@ -189,6 +239,18 @@ const styles = StyleSheet.create({
     image: {
         width: 88,
         height: 88,
+        borderRadius: 10,
+    },
+
+    imagePlaceholder: {
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    placeholderIcon: {
+        width: 20,
+        height: 20,
+        borderWidth: 2,
         borderRadius: 10,
     },
 

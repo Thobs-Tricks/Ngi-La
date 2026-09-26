@@ -14,8 +14,8 @@ import {
     Text,
     View,
 } from "react-native";
-import { Vendor } from "../constants/vendor";
 import { Theme } from "../constants/theme";
+import { Vendor } from "../types/vendor";
 
 type VendorDetailSheetProps = {
     vendor: Vendor | null;
@@ -43,6 +43,57 @@ export default function VendorDetailSheet({
             ? `${vendor.distance} m`
             : `${(vendor.distance / 1000).toFixed(1)} km`;
 
+    const category =
+        vendor.categories.length > 0
+            ? vendor.categories.join(" • ")
+            : "Uncategorized";
+
+    const today = new Date().toLocaleDateString(
+        "en-US",
+        {
+            weekday: "long",
+        }
+    );
+
+    const todayHours = vendor.tradingHours.find(
+        (hours) => hours.day === today
+    );
+
+    const formatTime = (
+        time: string | null
+    ) => {
+        if (!time) {
+            return "";
+        }
+
+        const [hourString, minute] =
+            time.split(":");
+
+        const hour = Number(hourString);
+
+        if (Number.isNaN(hour)) {
+            return time;
+        }
+
+        const period = hour >= 12 ? "PM" : "AM";
+        const displayHour =
+            hour % 12 || 12;
+
+        return `${displayHour}:${minute} ${period}`;
+    };
+
+    const hoursText = todayHours
+        ? todayHours.isOpen &&
+          todayHours.openTime &&
+          todayHours.closeTime
+            ? `${formatTime(
+                  todayHours.openTime
+              )} - ${formatTime(
+                  todayHours.closeTime
+              )}`
+            : "Closed today"
+        : "Hours unavailable";
+
     return (
         <Modal
             visible={visible}
@@ -54,7 +105,8 @@ export default function VendorDetailSheet({
                 style={[
                     styles.overlay,
                     {
-                        backgroundColor: theme.colors.overlay,
+                        backgroundColor:
+                            theme.colors.overlay,
                     },
                 ]}
             >
@@ -94,7 +146,7 @@ export default function VendorDetailSheet({
                                     },
                                 ]}
                             >
-                                {vendor.category}
+                                {category}
                             </Text>
                         </View>
 
@@ -112,17 +164,43 @@ export default function VendorDetailSheet({
                                 size={17}
                                 strokeWidth={2.2}
                                 color={
-                                    theme.colors.foreground
+                                    theme.colors
+                                        .foreground
                                 }
                             />
                         </Pressable>
                     </View>
 
                     <View style={styles.imageContainer}>
-                        <Image
-                            source={{ uri: vendor.image }}
-                            style={styles.image}
-                        />
+                        {vendor.image ? (
+                            <Image
+                                source={{
+                                    uri: vendor.image,
+                                }}
+                                style={styles.image}
+                            />
+                        ) : (
+                            <View
+                                style={[
+                                    styles.image,
+                                    styles.imagePlaceholder,
+                                    {
+                                        backgroundColor:
+                                            theme.colors
+                                                .muted,
+                                    },
+                                ]}
+                            >
+                                <MapPin
+                                    size={34}
+                                    strokeWidth={1.8}
+                                    color={
+                                        theme.colors
+                                            .mutedForeground
+                                    }
+                                />
+                            </View>
+                        )}
 
                         <View
                             style={[
@@ -175,7 +253,8 @@ export default function VendorDetailSheet({
                                     styles.name,
                                     {
                                         color:
-                                            theme.colors.foreground,
+                                            theme.colors
+                                                .foreground,
                                     },
                                 ]}
                             >
@@ -229,7 +308,11 @@ export default function VendorDetailSheet({
                                 style={styles.infoIcon}
                             />
 
-                            <View style={styles.infoContent}>
+                            <View
+                                style={
+                                    styles.infoContent
+                                }
+                            >
                                 <Text
                                     style={[
                                         styles.infoText,
@@ -269,7 +352,11 @@ export default function VendorDetailSheet({
                                 style={styles.infoIcon}
                             />
 
-                            <View style={styles.infoContent}>
+                            <View
+                                style={
+                                    styles.infoContent
+                                }
+                            >
                                 <Text
                                     style={[
                                         styles.infoText,
@@ -298,37 +385,45 @@ export default function VendorDetailSheet({
                                         },
                                     ]}
                                 >
-                                    {vendor.hours}
+                                    {hoursText}
                                 </Text>
                             </View>
                         </View>
 
-                        <View style={styles.infoRow}>
-                            <Phone
-                                size={18}
-                                strokeWidth={2}
-                                color={
-                                    theme.colors
-                                        .mutedForeground
-                                }
-                                style={styles.infoIcon}
-                            />
+                        {vendor.phone && (
+                            <View style={styles.infoRow}>
+                                <Phone
+                                    size={18}
+                                    strokeWidth={2}
+                                    color={
+                                        theme.colors
+                                            .mutedForeground
+                                    }
+                                    style={
+                                        styles.infoIcon
+                                    }
+                                />
 
-                            <View style={styles.infoContent}>
-                                <Text
-                                    style={[
-                                        styles.infoText,
-                                        {
-                                            color:
-                                                theme.colors
-                                                    .foreground,
-                                        },
-                                    ]}
+                                <View
+                                    style={
+                                        styles.infoContent
+                                    }
                                 >
-                                    {vendor.phone}
-                                </Text>
+                                    <Text
+                                        style={[
+                                            styles.infoText,
+                                            {
+                                                color:
+                                                    theme.colors
+                                                        .foreground,
+                                            },
+                                        ]}
+                                    >
+                                        {vendor.phone}
+                                    </Text>
+                                </View>
                             </View>
-                        </View>
+                        )}
 
                         <View style={styles.buttonRow}>
                             <Pressable
@@ -337,7 +432,8 @@ export default function VendorDetailSheet({
                                     styles.primaryButton,
                                     {
                                         backgroundColor:
-                                            theme.colors.primary,
+                                            theme.colors
+                                                .primary,
                                     },
                                 ]}
                             >
@@ -361,9 +457,11 @@ export default function VendorDetailSheet({
                                     styles.secondaryButton,
                                     {
                                         backgroundColor:
-                                            theme.colors.secondary,
+                                            theme.colors
+                                                .secondary,
                                         borderColor:
-                                            theme.colors.border,
+                                            theme.colors
+                                                .border,
                                     },
                                 ]}
                             >
@@ -451,6 +549,11 @@ const styles = StyleSheet.create({
         width: "100%",
         height: 190,
         borderRadius: 14,
+    },
+
+    imagePlaceholder: {
+        alignItems: "center",
+        justifyContent: "center",
     },
 
     ratingBadge: {

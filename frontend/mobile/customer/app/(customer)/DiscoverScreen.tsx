@@ -17,17 +17,17 @@ import {
 import {
     categories,
     distanceOptions,
-    vendors,
 } from "../../constants/vendor";
 import { Theme } from "../../constants/theme";
 import { useLocationContext } from "../../context/LocationContext";
 import CategoryPill from "../../components/CategoryPill";
 import FilterChip from "../../components/FilterChip";
 import VendorCard from "../../components/VendorCard";
+import useVendors from "../../hooks/useVendors";
 
 type DiscoverScreenProps = {
     theme: Theme;
-    onVendorPress: (vendorId: number) => void;
+    onVendorPress: (vendorId: string) => void;
 };
 
 export default function DiscoverScreen({
@@ -44,11 +44,18 @@ export default function DiscoverScreen({
 
     const {
         location,
-        loading,
+        loading: locationLoading,
         retryLocation,
     } = useLocationContext();
 
-    const locationText = loading
+    const {
+        vendors,
+        loading: vendorsLoading,
+        error: vendorsError,
+        refresh: refreshVendors,
+    } = useVendors();
+
+    const locationText = locationLoading
         ? "Locating..."
         : location?.address.suburb &&
           location?.address.city
@@ -65,17 +72,25 @@ export default function DiscoverScreen({
                   ? 1000
                   : 10000;
 
+        const query = searchQuery.trim().toLowerCase();
+
         return vendors.filter((vendor) => {
             const matchesCategory =
                 selectedCategory === "All" ||
-                vendor.category === selectedCategory;
-
-            const query = searchQuery.trim().toLowerCase();
+                vendor.categories.includes(
+                    selectedCategory
+                );
 
             const matchesSearch =
                 query.length === 0 ||
-                vendor.name.toLowerCase().includes(query) ||
-                vendor.category.toLowerCase().includes(query) ||
+                vendor.name
+                    .toLowerCase()
+                    .includes(query) ||
+                vendor.categories.some((category) =>
+                    category
+                        .toLowerCase()
+                        .includes(query)
+                ) ||
                 vendor.description
                     .toLowerCase()
                     .includes(query);
@@ -98,6 +113,7 @@ export default function DiscoverScreen({
             );
         });
     }, [
+        vendors,
         selectedCategory,
         searchQuery,
         selectedDistance,
@@ -118,11 +134,11 @@ export default function DiscoverScreen({
         >
             <Pressable
                 onPress={retryLocation}
-                disabled={loading}
+                disabled={locationLoading}
                 style={({ pressed }) => [
                     styles.locationRow,
                     {
-                        opacity: loading
+                        opacity: locationLoading
                             ? 0.6
                             : pressed
                             ? 0.7
@@ -342,7 +358,115 @@ export default function DiscoverScreen({
                 </Pressable>
             </View>
 
-            {filteredVendors.length > 0 ? (
+            {vendorsLoading ? (
+                <View
+                    style={[
+                        styles.emptyState,
+                        {
+                            backgroundColor:
+                                theme.colors.card,
+                            borderColor:
+                                theme.colors.border,
+                        },
+                    ]}
+                >
+                    <Text
+                        style={[
+                            styles.emptyTitle,
+                            {
+                                color:
+                                    theme.colors.foreground,
+                            },
+                        ]}
+                    >
+                        Loading vendors...
+                    </Text>
+
+                    <Text
+                        style={[
+                            styles.emptyDescription,
+                            {
+                                color:
+                                    theme.colors
+                                        .mutedForeground,
+                            },
+                        ]}
+                    >
+                        Finding vendors near you.
+                    </Text>
+                </View>
+            ) : vendorsError ? (
+                <View
+                    style={[
+                        styles.emptyState,
+                        {
+                            backgroundColor:
+                                theme.colors.card,
+                            borderColor:
+                                theme.colors.border,
+                        },
+                    ]}
+                >
+                    <Text
+                        style={[
+                            styles.emptyTitle,
+                            {
+                                color:
+                                    theme.colors.foreground,
+                            },
+                        ]}
+                    >
+                        Unable to load vendors
+                    </Text>
+
+                    <Text
+                        style={[
+                            styles.emptyDescription,
+                            {
+                                color:
+                                    theme.colors
+                                        .mutedForeground,
+                            },
+                        ]}
+                    >
+                        {vendorsError}
+                    </Text>
+
+                    <Pressable
+                        onPress={refreshVendors}
+                        style={({ pressed }) => [
+                            styles.retryButton,
+                            {
+                                backgroundColor:
+                                    theme.colors.primary,
+                                opacity: pressed ? 0.8 : 1,
+                            },
+                        ]}
+                    >
+                        <RefreshCw
+                            size={15}
+                            strokeWidth={2}
+                            color={
+                                theme.colors
+                                    .primaryForeground
+                            }
+                        />
+
+                        <Text
+                            style={[
+                                styles.retryButtonText,
+                                {
+                                    color:
+                                        theme.colors
+                                            .primaryForeground,
+                                },
+                            ]}
+                        >
+                            Retry
+                        </Text>
+                    </Pressable>
+                </View>
+            ) : filteredVendors.length > 0 ? (
                 filteredVendors.map((vendor) => (
                     <VendorCard
                         key={vendor.id}
@@ -527,6 +651,21 @@ const styles = StyleSheet.create({
     emptyDescription: {
         fontSize: 12,
         textAlign: "center",
+    },
+
+    retryButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginTop: 14,
+    },
+
+    retryButtonText: {
+        fontSize: 12,
+        fontWeight: "600",
     },
 
     bottomSpacing: {
