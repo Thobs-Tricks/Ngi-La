@@ -11,9 +11,9 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Overview — Ngila Console" },
-      { name: "description", content: "Live pulse of Ngila vendors, verifications, reports and users." },
+      { name: "description", content: "Live pulse of Ngila vendors, verifications and users." },
       { property: "og:title", content: "Overview — Ngila Console" },
-      { property: "og:description", content: "Live pulse of Ngila vendors, verifications, reports and users." },
+      { property: "og:description", content: "Live pulse of Ngila vendors, verifications and users." },
     ],
   }),
   component: Overview,
@@ -38,15 +38,11 @@ function Overview() {
   const { data: vendors } = useQuery({ queryKey: ["admin-vendors"], queryFn: fetchAdminVendors, enabled });
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: fetchCategories, enabled });
 
-  if (!enabled) return null;
-
   const statCards = stats
     ? [
         { label: "Total vendors", value: stats.totalVendors.toLocaleString(), note: "across the network", tone: "moss" as const },
-        { label: "Community added", value: stats.communityAdded.toLocaleString(), note: `of ${stats.totalVendors} total`, tone: "mute" as const },
         { label: "Pending verification", value: stats.pendingVerification.toLocaleString(), note: "awaiting review", tone: "ember" as const, alert: stats.pendingVerification > 0 },
         { label: "Active users", value: stats.activeUsers.toLocaleString(), note: "customers, vendors & admins", tone: "moss" as const },
-        { label: "Reports open", value: stats.reportsOpen.toLocaleString(), note: "flags & disputes", tone: "clay" as const, alert: stats.reportsOpen > 0 },
       ]
     : [];
 
@@ -65,7 +61,7 @@ function Overview() {
           </Link>
         }
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {statCards.map((s, i) => (
           <StatCard key={s.label} {...s} delay={100 + i * 50} />
         ))}

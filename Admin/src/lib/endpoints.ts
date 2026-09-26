@@ -7,8 +7,9 @@ import type {
   AuthResponse,
   Category,
   CurrentUser,
+  EmailSettings,
   Gender,
-  Report,
+  PlatformStats,
   UserType,
   VerificationQueueItem,
 } from "./types";
@@ -52,6 +53,35 @@ export function revokeSession(refreshToken: string) {
   });
 }
 
+// Public - no session yet when these are called (from an emailed link).
+export function confirmEmail(userId: string, token: string) {
+  return apiRequest<{ message: string }>("/api/auth/confirm-email", {
+    method: "POST",
+    body: { userId, token },
+    auth: false,
+  });
+}
+
+export function resetPassword(email: string, token: string, newPassword: string) {
+  return apiRequest<{ message: string }>("/api/auth/reset-password", {
+    method: "POST",
+    body: { email, token, newPassword },
+    auth: false,
+  });
+}
+
+export function changePassword(currentPassword: string, newPassword: string) {
+  return apiRequest<{ message: string }>("/api/auth/change-password", {
+    method: "POST",
+    body: { currentPassword, newPassword },
+  });
+}
+
+// Public - no admin session required. Used on the login screen.
+export function fetchPlatformStats() {
+  return apiRequest<PlatformStats>("/api/stats", { auth: false });
+}
+
 // ---------- Dashboard ----------
 
 export function fetchStats() {
@@ -64,6 +94,14 @@ export function fetchActivity(take = 20) {
 
 export function fetchAdminUsers() {
   return apiRequest<AdminUser[]>("/api/admin/users");
+}
+
+export function suspendUser(id: string) {
+  return apiRequest<AdminUser>(`/api/admin/users/${id}/suspend`, { method: "POST" });
+}
+
+export function unsuspendUser(id: string) {
+  return apiRequest<AdminUser>(`/api/admin/users/${id}/unsuspend`, { method: "POST" });
 }
 
 // ---------- Vendors ----------
@@ -111,12 +149,15 @@ export function createCategory(name: string) {
   return apiRequest<Category>("/api/categories", { method: "POST", body: { name } });
 }
 
-// ---------- Reports ----------
+// ---------- Email settings ----------
 
-export function fetchReports() {
-  return apiRequest<Report[]>("/api/admin/reports");
+export function fetchEmailSettings() {
+  return apiRequest<EmailSettings>("/api/admin/email-settings");
 }
 
-export function resolveReport(id: string) {
-  return apiRequest<Report>(`/api/admin/reports/${id}/resolve`, { method: "POST" });
+export function updateEmailSettings(senderEmail: string, appPassword: string) {
+  return apiRequest<EmailSettings>("/api/admin/email-settings", {
+    method: "PUT",
+    body: { senderEmail, appPassword },
+  });
 }

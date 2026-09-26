@@ -30,10 +30,16 @@ export type CurrentUser = {
 
 export type AdminStats = {
   totalVendors: number;
-  communityAdded: number;
   pendingVerification: number;
   activeUsers: number;
-  reportsOpen: number;
+};
+
+// Public (unauthenticated) platform stats - GET /api/stats. Used on the login screen, which has
+// no admin session yet to call the authenticated /api/admin/stats with.
+export type PlatformStats = {
+  vendorsMapped: number;
+  communityReviews: number;
+  areasLive: number;
 };
 
 export type ActivityItem = {
@@ -55,7 +61,7 @@ export type AdminUser = {
   reviewsWritten: number;
 };
 
-export type VendorAdminStatus = "Verified" | "Pending" | "CommunityAdded" | "Suspended";
+export type VendorAdminStatus = "Verified" | "Pending" | "Suspended";
 
 export type AdminVendor = {
   id: string;
@@ -90,14 +96,8 @@ export type Category = {
   vendorCount: number;
 };
 
-export type ReportKind = "Flag" | "ReviewDispute";
-
-export type Report = {
-  id: string;
-  kind: string;
-  priority: string;
-  title: string;
-  detail: string;
-  isResolved: boolean;
-  time: string;
+export type EmailSettings = {
+  senderEmail: string | null;
+  isConfigured: boolean;
+  updatedAt: string | null;
 };

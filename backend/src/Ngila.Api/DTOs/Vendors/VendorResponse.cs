@@ -3,7 +3,7 @@ namespace Ngila.Api.DTOs.Vendors;
 public record VendorResponse(
     Guid Id,
     string Name,
-    string Category,
+    IReadOnlyList<string> Categories,
     string? Description,
     string Location,
     double Distance,
@@ -15,5 +15,6 @@ public record VendorResponse(
     bool IsVerified,
     bool Claimed,
     string? Image,
+    IReadOnlyList<string> Photos,
     string? Phone,
-    string Hours);
+    IReadOnlyList<TradingHourResponse> TradingHours);

@@ -14,12 +14,15 @@ public interface IVendorService
     Task<ServiceResult<CategoryResponse>> CreateCategoryAsync(CategoryCreateRequest request, CancellationToken ct = default);
     Task<IReadOnlyList<VendorResponse>> GetVendorsAsync(NearbyQuery query, CancellationToken ct = default);
     Task<VendorResponse?> GetVendorByIdAsync(Guid id, decimal? latitude, decimal? longitude, CancellationToken ct = default);
-    Task<VendorResponse> AddVendorAsync(Guid addedByUserId, AddVendorRequest request, CancellationToken ct = default);
     Task<PlatformStatsResponse> GetStatsAsync(CancellationToken ct = default);
 
     // "MySpaza" - the calling vendor's own shop profile, created the first time they set it up.
+    // Split into three independent calls so the app can save each section (details, trading
+    // hours, photos) on its own without resending the whole profile every time.
     Task<ServiceResult<VendorResponse>> GetOwnProfileAsync(Guid userId, CancellationToken ct = default);
     Task<ServiceResult<VendorResponse>> UpsertOwnProfileAsync(Guid userId, UpsertVendorProfileRequest request, CancellationToken ct = default);
+    Task<ServiceResult<VendorResponse>> UpdateOwnTradingHoursAsync(Guid userId, UpdateVendorTradingHoursRequest request, CancellationToken ct = default);
+    Task<ServiceResult<VendorResponse>> UpdateOwnPhotosAsync(Guid userId, UpdateVendorPhotosRequest request, CancellationToken ct = default);
 
     // Admin verification queue: vendors with a claimant (UserId set) still awaiting a decision.
     Task<IReadOnlyList<VerificationQueueItemResponse>> GetVerificationQueueAsync(CancellationToken ct = default);

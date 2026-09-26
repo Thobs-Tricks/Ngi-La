@@ -16,10 +16,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<FeedPost> FeedPosts => Set<FeedPost>();
+    public DbSet<FeedPostPhoto> FeedPostPhotos => Set<FeedPostPhoto>();
+    public DbSet<FeedPostLike> FeedPostLikes => Set<FeedPostLike>();
+    public DbSet<FeedPostComment> FeedPostComments => Set<FeedPostComment>();
+    public DbSet<VendorProfilePhoto> VendorProfilePhotos => Set<VendorProfilePhoto>();
+    public DbSet<VendorTradingHours> VendorTradingHours => Set<VendorTradingHours>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Notification> Notifications => Set<Notification>();
-    public DbSet<Report> Reports => Set<Report>();
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
+    public DbSet<EmailSettings> EmailSettings => Set<EmailSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -70,14 +75,35 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .HasForeignKey(v => v.AddedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            entity.HasOne(v => v.Category)
-                .WithMany(c => c.VendorProfiles)
-                .HasForeignKey(v => v.CategoryId)
-                .OnDelete(DeleteBehavior.SetNull);
+            // Many-to-many via EF's implicit skip-navigation join table (VendorProfileCategory) -
+            // no explicit join entity needed since the relationship carries no extra data.
+            entity.HasMany(v => v.Categories)
+                .WithMany(c => c.VendorProfiles);
 
             entity.HasIndex(v => v.UserId).IsUnique();
-            entity.HasIndex(v => v.CategoryId);
             entity.HasIndex(v => v.AddedByUserId);
+        });
+
+        builder.Entity<VendorProfilePhoto>(entity =>
+        {
+            entity.Property(p => p.Url).HasMaxLength(2048).IsRequired();
+
+            entity.HasOne(p => p.VendorProfile)
+                .WithMany(v => v.Photos)
+                .HasForeignKey(p => p.VendorProfileId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(p => p.VendorProfileId);
+        });
+
+        builder.Entity<VendorTradingHours>(entity =>
+        {
+            entity.HasOne(t => t.VendorProfile)
+                .WithMany(v => v.TradingHours)
+                .HasForeignKey(t => t.VendorProfileId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(t => t.VendorProfileId);
         });
 
         builder.Entity<CustomerProfile>(entity =>
@@ -114,6 +140,54 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(f => f.CreatedAt);
+        });
+
+        builder.Entity<FeedPostPhoto>(entity =>
+        {
+            entity.Property(p => p.Url).HasMaxLength(2048).IsRequired();
+
+            entity.HasOne(p => p.FeedPost)
+                .WithMany(f => f.Photos)
+                .HasForeignKey(p => p.FeedPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(p => p.FeedPostId);
+        });
+
+        builder.Entity<FeedPostLike>(entity =>
+        {
+            entity.HasKey(l => new { l.FeedPostId, l.UserId });
+
+            entity.HasOne(l => l.FeedPost)
+                .WithMany()
+                .HasForeignKey(l => l.FeedPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict, not Cascade - alongside FeedPostId's cascade (FeedPost -> AuthorUserId ->
+            // AspNetUsers), a second cascading path straight from UserId to AspNetUsers would be
+            // the same "multiple cascade paths" conflict seen elsewhere in this schema.
+            entity.HasOne(l => l.User)
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<FeedPostComment>(entity =>
+        {
+            entity.Property(c => c.Content).HasMaxLength(500).IsRequired();
+
+            entity.HasOne(c => c.FeedPost)
+                .WithMany()
+                .HasForeignKey(c => c.FeedPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict for the same reason as FeedPostLike.User above.
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(c => c.FeedPostId);
         });
 
         builder.Entity<Review>(entity =>
@@ -155,40 +229,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
         });
 
-        builder.Entity<Report>(entity =>
-        {
-            entity.Property(r => r.Title).HasMaxLength(200).IsRequired();
-            entity.Property(r => r.Detail).HasMaxLength(1000).IsRequired();
-
-            entity.HasOne(r => r.ReporterUser)
-                .WithMany()
-                .HasForeignKey(r => r.ReporterUserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // All Restrict: Report already cascades from ReporterUserId, and SQL Server rejects
-            // a second cascade-capable path to the same ancestor - directly (ResolvedByUserId ->
-            // AspNetUsers) or transitively (TargetVendorId -> VendorProfiles, and
-            // TargetReviewId -> Reviews.VendorId -> VendorProfiles, both of which can reach
-            // AspNetUsers).
-            entity.HasOne(r => r.ResolvedByUser)
-                .WithMany()
-                .HasForeignKey(r => r.ResolvedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(r => r.TargetVendor)
-                .WithMany()
-                .HasForeignKey(r => r.TargetVendorId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(r => r.TargetReview)
-                .WithMany()
-                .HasForeignKey(r => r.TargetReviewId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasIndex(r => r.IsResolved);
-            entity.HasIndex(r => r.CreatedAt);
-        });
-
         builder.Entity<ActivityLogEntry>(entity =>
         {
             entity.Property(a => a.Description).HasMaxLength(300).IsRequired();
@@ -200,6 +240,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(a => a.CreatedAt);
+        });
+
+        builder.Entity<EmailSettings>(entity =>
+        {
+            // Strict singleton row (Id is always 1) - not an auto-increment surrogate key.
+            entity.Property(e => e.Id).ValueGeneratedNever();
+            entity.Property(e => e.SenderEmail).HasMaxLength(256);
+            entity.Property(e => e.EncryptedAppPassword).HasMaxLength(500);
         });
     }
 }

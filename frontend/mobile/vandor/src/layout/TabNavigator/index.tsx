@@ -2,9 +2,9 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import DashboardScreen from '../../pages/Dashboard';
-import MySpazaScreen from '../../pages/MySpaza';
-import ProfileScreen from '../../pages/Profile';
-import { colors } from '../../styles/theme';
+import MySpazaNavigator from '../../router/MySpazaNavigator';
+import ProfileNavigator from '../../router/ProfileNavigator';
+import { useThemeColors } from '../../styles/theme';
 import type { MainTabParamList } from '../../router/types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -18,6 +18,7 @@ const ICONS: Record<keyof MainTabParamList, keyof typeof Feather.glyphMap> = {
 // The vendor app's main tab bar — Dashboard (home), My Spaza (vendor profile),
 // and Profile (account/settings).
 export default function TabNavigator() {
+  const colors = useThemeColors();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -38,8 +39,8 @@ export default function TabNavigator() {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="MySpaza" component={MySpazaScreen} options={{ title: 'My Spaza' }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="MySpaza" component={MySpazaNavigator} options={{ title: 'My Spaza' }} />
+      <Tab.Screen name="Profile" component={ProfileNavigator} />
     </Tab.Navigator>
   );
 }

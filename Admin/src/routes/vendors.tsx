@@ -14,29 +14,31 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/vendors")({
   head: () => ({
     meta: [
-      { title: "Claims & vendors — Ngila Console" },
+      { title: "Vendors — Ngila Console" },
       { name: "description", content: "Browse, filter and manage every vendor listing on Ngila." },
-      { property: "og:title", content: "Claims & vendors — Ngila Console" },
+      { property: "og:title", content: "Vendors — Ngila Console" },
       { property: "og:description", content: "Browse, filter and manage every vendor listing on Ngila." },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { q?: string } =>
+    typeof search["q"] === "string" ? { q: search["q"] } : {},
   component: Vendors,
 });
 
-const filters: ("All" | VendorAdminStatus)[] = ["All", "Verified", "Pending", "CommunityAdded", "Suspended"];
+const filters: ("All" | VendorAdminStatus)[] = ["All", "Verified", "Pending", "Suspended"];
 const filterLabel: Record<(typeof filters)[number], string> = {
   All: "All",
   Verified: "Verified",
   Pending: "Pending",
-  CommunityAdded: "Community added",
   Suspended: "Suspended",
 };
 
 function Vendors() {
   const { status } = useAuth();
   const queryClient = useQueryClient();
+  const { q: initialQ } = Route.useSearch();
   const [f, setF] = useState<(typeof filters)[number]>("All");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQ ?? "");
 
   const { data: vendors, isLoading } = useQuery({
     queryKey: ["admin-vendors"],
@@ -64,7 +66,7 @@ function Vendors() {
 
   return (
     <AdminShell>
-      <PageHead kicker={`${vendors?.length ?? 0} listings`} title="Claims & vendors" />
+      <PageHead kicker={`${vendors?.length ?? 0} listings`} title="Vendors" />
       <div className="flex flex-wrap items-center gap-2">
         {filters.map((x) => (
           <button

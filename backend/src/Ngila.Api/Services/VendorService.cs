@@ -13,6 +13,16 @@ namespace Ngila.Api.Services;
 
 public class VendorService : IVendorService
 {
+    private const int MaxGalleryPhotos = 5;
+
+    // Monday-first, matching the vendor app's trading-hours editor - DayOfWeek numbers Sunday=0,
+    // which would otherwise sort Sunday to the front of every response.
+    private static readonly DayOfWeek[] WeekOrder =
+    {
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
+        DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday,
+    };
+
     private readonly ApplicationDbContext _context;
     private readonly INotificationService _notificationService;
     private readonly IActivityLogService _activityLog;
@@ -51,14 +61,14 @@ public class VendorService : IVendorService
         var vendorQuery = DiscoverableVendors();
 
         if (query.CategoryId is not null)
-            vendorQuery = vendorQuery.Where(v => v.CategoryId == query.CategoryId);
+            vendorQuery = vendorQuery.Where(v => v.Categories.Any(c => c.Id == query.CategoryId));
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = query.Search.Trim();
             vendorQuery = vendorQuery.Where(v =>
                 v.BusinessName.Contains(term) ||
-                (v.Category != null && v.Category.Name.Contains(term)));
+                v.Categories.Any(c => c.Name.Contains(term)));
         }
 
         var vendors = await vendorQuery.ToListAsync(ct);
@@ -82,44 +92,9 @@ public class VendorService : IVendorService
         return MapToResponse(vendor, latitude ?? GeoUtils.DefaultLatitude, longitude ?? GeoUtils.DefaultLongitude);
     }
 
-    public async Task<VendorResponse> AddVendorAsync(Guid addedByUserId, AddVendorRequest request, CancellationToken ct = default)
-    {
-        var categoryExists = await _context.Categories.AnyAsync(c => c.Id == request.CategoryId, ct);
-        if (!categoryExists)
-            throw new InvalidOperationException("Selected category does not exist.");
-
-        var vendor = new VendorProfile
-        {
-            UserId = null, // unclaimed - see product doc's "community vendor discovery"
-            AddedByUserId = addedByUserId,
-            BusinessName = request.BusinessName,
-            Description = request.Description,
-            CategoryId = request.CategoryId,
-            LocationDescription = request.LocationDescription,
-            Latitude = request.Latitude,
-            Longitude = request.Longitude,
-            ContactPhone = request.ContactPhone,
-            ImageUrl = request.ImageUrl,
-            Status = VendorStatus.PendingVerification,
-        };
-
-        _context.VendorProfiles.Add(vendor);
-        await _context.SaveChangesAsync(ct);
-
-        var category = await _context.Categories.FirstAsync(c => c.Id == request.CategoryId, ct);
-        vendor.Category = category;
-
-        await _activityLog.LogAsync(addedByUserId, $"added {vendor.BusinessName}", "vendor-added", ct);
-
-        return MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude);
-    }
-
     public async Task<ServiceResult<VendorResponse>> GetOwnProfileAsync(Guid userId, CancellationToken ct = default)
     {
-        var vendor = await _context.VendorProfiles
-            .Include(v => v.User)
-            .Include(v => v.Category)
-            .FirstOrDefaultAsync(v => v.UserId == userId, ct);
+        var vendor = await OwnProfileQuery().FirstOrDefaultAsync(v => v.UserId == userId, ct);
 
         if (vendor is null)
             return ServiceResult<VendorResponse>.Failure("You haven't set up your shop profile yet.", 404);
@@ -129,14 +104,11 @@ public class VendorService : IVendorService
 
     public async Task<ServiceResult<VendorResponse>> UpsertOwnProfileAsync(Guid userId, UpsertVendorProfileRequest request, CancellationToken ct = default)
     {
-        var categoryExists = await _context.Categories.AnyAsync(c => c.Id == request.CategoryId, ct);
-        if (!categoryExists)
-            return ServiceResult<VendorResponse>.Failure("Selected category does not exist.", 400);
+        var categories = await _context.Categories.Where(c => request.CategoryIds.Contains(c.Id)).ToListAsync(ct);
+        if (categories.Count != request.CategoryIds.Distinct().Count())
+            return ServiceResult<VendorResponse>.Failure("One or more selected categories does not exist.", 400);
 
-        var vendor = await _context.VendorProfiles
-            .Include(v => v.User)
-            .Include(v => v.Category)
-            .FirstOrDefaultAsync(v => v.UserId == userId, ct);
+        var vendor = await OwnProfileQuery().FirstOrDefaultAsync(v => v.UserId == userId, ct);
 
         var isNew = vendor is null;
         if (vendor is null)
@@ -147,31 +119,86 @@ public class VendorService : IVendorService
 
         vendor.BusinessName = request.BusinessName;
         vendor.Description = request.Description;
-        vendor.CategoryId = request.CategoryId;
         vendor.LocationDescription = request.LocationDescription;
         vendor.Latitude = request.Latitude;
         vendor.Longitude = request.Longitude;
-        vendor.OpeningTime = request.OpeningTime;
-        vendor.ClosingTime = request.ClosingTime;
+        vendor.ContactPhone = request.ContactPhone;
         vendor.ImageUrl = request.ImageUrl;
+
+        // Full replace - resend the whole set each time, not a diff/patch. Categories are
+        // pre-existing rows being re-linked (not created), so mutating the tracked collection in
+        // place is safe here - unlike the Photos/TradingHours replace pattern below, there's no
+        // "new row with an already-set key" ambiguity for EF to misread.
+        vendor.Categories.Clear();
+        foreach (var category in categories)
+            vendor.Categories.Add(category);
 
         await _context.SaveChangesAsync(ct);
 
         if (isNew)
-        {
             vendor.User = await _context.Users.FirstAsync(u => u.Id == userId, ct);
-            vendor.Category = await _context.Categories.FirstAsync(c => c.Id == request.CategoryId, ct);
-        }
 
         return ServiceResult<VendorResponse>.Success(
             MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude), isNew ? 201 : 200);
+    }
+
+    public async Task<ServiceResult<VendorResponse>> UpdateOwnTradingHoursAsync(Guid userId, UpdateVendorTradingHoursRequest request, CancellationToken ct = default)
+    {
+        var vendor = await OwnProfileQuery().FirstOrDefaultAsync(v => v.UserId == userId, ct);
+        if (vendor is null)
+            return ServiceResult<VendorResponse>.Failure("You haven't set up your shop profile yet.", 404);
+
+        // Added straight to the DbSet rather than through the navigation collection: the entity
+        // carries a non-default Guid Id (set by its own constructor), and when EF only discovers
+        // new rows via navigation-collection fixup on an already-tracked parent, it assumes a
+        // non-default key means "existing row" and marks them Modified instead of Added -
+        // producing UPDATEs that hit zero rows. Adding via the DbSet directly forces Added state
+        // unambiguously regardless of the key's value.
+        if (vendor.TradingHours.Count > 0)
+            _context.VendorTradingHours.RemoveRange(vendor.TradingHours);
+        vendor.TradingHours.Clear();
+        _context.VendorTradingHours.AddRange(request.TradingHours.Select(h => new VendorTradingHours
+        {
+            VendorProfileId = vendor.Id,
+            DayOfWeek = Enum.Parse<DayOfWeek>(h.Day),
+            IsOpen = h.IsOpen,
+            OpenTime = h.IsOpen && h.OpenTime is not null ? TimeSpan.ParseExact(h.OpenTime, "hh\\:mm", null) : null,
+            CloseTime = h.IsOpen && h.CloseTime is not null ? TimeSpan.ParseExact(h.CloseTime, "hh\\:mm", null) : null,
+        }));
+
+        await _context.SaveChangesAsync(ct);
+
+        return ServiceResult<VendorResponse>.Success(
+            MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude));
+    }
+
+    public async Task<ServiceResult<VendorResponse>> UpdateOwnPhotosAsync(Guid userId, UpdateVendorPhotosRequest request, CancellationToken ct = default)
+    {
+        if (request.PhotoUrls.Count > MaxGalleryPhotos)
+            return ServiceResult<VendorResponse>.Failure($"You can add up to {MaxGalleryPhotos} photos.", 400);
+
+        var vendor = await OwnProfileQuery().FirstOrDefaultAsync(v => v.UserId == userId, ct);
+        if (vendor is null)
+            return ServiceResult<VendorResponse>.Failure("You haven't set up your shop profile yet.", 404);
+
+        // Same DbSet-direct pattern as trading hours above, for the same reason.
+        if (vendor.Photos.Count > 0)
+            _context.VendorProfilePhotos.RemoveRange(vendor.Photos);
+        vendor.Photos.Clear();
+        _context.VendorProfilePhotos.AddRange(
+            request.PhotoUrls.Select((url, index) => new VendorProfilePhoto { VendorProfileId = vendor.Id, Url = url, SortOrder = index }));
+
+        await _context.SaveChangesAsync(ct);
+
+        return ServiceResult<VendorResponse>.Success(
+            MapToResponse(vendor, GeoUtils.DefaultLatitude, GeoUtils.DefaultLongitude));
     }
 
     public async Task<IReadOnlyList<VerificationQueueItemResponse>> GetVerificationQueueAsync(CancellationToken ct = default)
     {
         var pending = await _context.VendorProfiles
             .Include(v => v.User)
-            .Include(v => v.Category)
+            .Include(v => v.Categories)
             .Include(v => v.AddedByUser)
             .Where(v => v.Status == VendorStatus.PendingVerification && v.UserId != null)
             .OrderBy(v => v.CreatedAt)
@@ -180,7 +207,7 @@ public class VendorService : IVendorService
         return pending.Select(v => new VerificationQueueItemResponse(
             v.Id,
             v.BusinessName,
-            v.Category?.Name ?? "Uncategorised",
+            CategoryNames(v),
             v.LocationDescription ?? "Location not set",
             DisplayFormatting.DisplayName(v.User!.FirstName, v.User.LastName),
             v.User.Email!,
@@ -192,10 +219,7 @@ public class VendorService : IVendorService
 
     public async Task<ServiceResult<VendorResponse>> VerifyVendorAsync(Guid vendorId, Guid adminUserId, CancellationToken ct = default)
     {
-        var vendor = await _context.VendorProfiles
-            .Include(v => v.User)
-            .Include(v => v.Category)
-            .FirstOrDefaultAsync(v => v.Id == vendorId, ct);
+        var vendor = await OwnProfileQuery().FirstOrDefaultAsync(v => v.Id == vendorId, ct);
 
         if (vendor is null)
             return ServiceResult<VendorResponse>.Failure("Vendor not found.", 404);
@@ -274,7 +298,7 @@ public class VendorService : IVendorService
     public async Task<IReadOnlyList<AdminVendorResponse>> GetAllForAdminAsync(CancellationToken ct = default)
     {
         var vendors = await _context.VendorProfiles
-            .Include(v => v.Category)
+            .Include(v => v.Categories)
             .Include(v => v.AddedByUser)
             .OrderByDescending(v => v.CreatedAt)
             .ToListAsync(ct);
@@ -285,7 +309,7 @@ public class VendorService : IVendorService
     public async Task<ServiceResult<AdminVendorResponse>> SetSuspendedAsync(Guid vendorId, bool suspended, Guid adminUserId, CancellationToken ct = default)
     {
         var vendor = await _context.VendorProfiles
-            .Include(v => v.Category)
+            .Include(v => v.Categories)
             .Include(v => v.AddedByUser)
             .FirstOrDefaultAsync(v => v.Id == vendorId, ct);
 
@@ -324,7 +348,7 @@ public class VendorService : IVendorService
     private static AdminVendorResponse MapToAdminResponse(VendorProfile v) => new(
         v.Id,
         v.BusinessName,
-        v.Category?.Name ?? "Uncategorised",
+        CategoryNames(v),
         v.LocationDescription ?? "Location not set",
         DeriveAdminStatus(v),
         v.Rating,
@@ -338,17 +362,27 @@ public class VendorService : IVendorService
     {
         VendorStatus.Suspended => "Suspended",
         VendorStatus.Verified => "Verified",
-        _ => v.UserId is null ? "CommunityAdded" : "Pending",
+        _ => "Pending",
     };
+
+    private static string CategoryNames(VendorProfile v) =>
+        v.Categories.Count > 0 ? string.Join(", ", v.Categories.Select(c => c.Name).OrderBy(n => n)) : "Uncategorised";
+
+    // Everything a VendorResponse needs to be built from, in one place - used by every read path
+    // (discovery, own-profile, verification decisions) so nobody forgets an Include and gets a
+    // silently-empty Categories/Photos/TradingHours list back.
+    private IQueryable<VendorProfile> OwnProfileQuery() =>
+        _context.VendorProfiles
+            .Include(v => v.User)
+            .Include(v => v.Categories)
+            .Include(v => v.Photos)
+            .Include(v => v.TradingHours);
 
     // A vendor is publicly discoverable if it's not suspended, and either unclaimed (community
     // added, no account to confirm an email on) or its owner has confirmed their email - closes
     // a spam-listing gap where an unconfirmed self-registration would otherwise be visible.
     private IQueryable<VendorProfile> DiscoverableVendors() =>
-        _context.VendorProfiles
-            .Include(v => v.User)
-            .Include(v => v.Category)
-            .Where(v => v.Status != VendorStatus.Suspended && (v.UserId == null || v.User!.EmailConfirmed));
+        OwnProfileQuery().Where(v => v.Status != VendorStatus.Suspended && (v.UserId == null || v.User!.EmailConfirmed));
 
     private static VendorResponse MapToResponse(VendorProfile vendor, decimal latitude, decimal longitude)
     {
@@ -356,10 +390,16 @@ public class VendorService : IVendorService
             ? GeoUtils.DistanceMeters(latitude, longitude, vendor.Latitude.Value, vendor.Longitude.Value)
             : 0;
 
+        var tradingHours = WeekOrder
+            .Select(day => vendor.TradingHours.FirstOrDefault(h => h.DayOfWeek == day) is { } h
+                ? new TradingHourResponse(day.ToString(), h.IsOpen, h.OpenTime is null ? null : DisplayFormatting.FormatTime(h.OpenTime.Value), h.CloseTime is null ? null : DisplayFormatting.FormatTime(h.CloseTime.Value))
+                : new TradingHourResponse(day.ToString(), false, null, null))
+            .ToList();
+
         return new VendorResponse(
             Id: vendor.Id,
             Name: vendor.BusinessName,
-            Category: vendor.Category?.Name ?? "Uncategorised",
+            Categories: vendor.Categories.Select(c => c.Name).OrderBy(n => n).ToList(),
             Description: vendor.Description,
             Location: vendor.LocationDescription ?? "Location not set",
             Distance: Math.Round(distance, 0),
@@ -367,11 +407,14 @@ public class VendorService : IVendorService
             Longitude: vendor.Longitude,
             Rating: vendor.Rating,
             ReviewsCount: vendor.ReviewsCount,
-            IsOpen: DisplayFormatting.IsOpenNow(vendor.OpeningTime, vendor.ClosingTime),
+            IsOpen: DisplayFormatting.IsOpenNow(vendor.TradingHours),
             IsVerified: vendor.Status == VendorStatus.Verified,
             Claimed: vendor.UserId is not null,
             Image: vendor.ImageUrl,
-            Phone: vendor.User?.PhoneNumber ?? vendor.ContactPhone,
-            Hours: DisplayFormatting.FormatHours(vendor.OpeningTime, vendor.ClosingTime));
+            Photos: vendor.Photos.OrderBy(p => p.SortOrder).Select(p => p.Url).ToList(),
+            // The vendor's own business contact number takes priority over their personal
+            // account phone, since they may want customers calling a different line.
+            Phone: vendor.ContactPhone ?? vendor.User?.PhoneNumber,
+            TradingHours: tradingHours);
     }
 }

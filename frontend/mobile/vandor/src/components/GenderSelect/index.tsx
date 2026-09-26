@@ -3,9 +3,9 @@ import { Pressable, Text, View } from 'react-native';
 import type { Gender } from '../../types';
 
 const OPTIONS: { label: string; value: Gender }[] = [
-  { label: 'Female', value: 'female' },
-  { label: 'Male', value: 'male' },
-  { label: 'Other', value: 'other' },
+  { label: 'Female', value: 'Female' },
+  { label: 'Male', value: 'Male' },
+  { label: 'Other', value: 'Other' },
 ];
 
 interface GenderSelectProps {

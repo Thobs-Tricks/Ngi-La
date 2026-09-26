@@ -4,7 +4,6 @@ using Ngila.Api.Common;
 using Ngila.Api.Data;
 using Ngila.Api.DTOs.Auth;
 using Ngila.Api.DTOs.Common;
-using Ngila.Api.DTOs.Vendors;
 using Ngila.Api.Models.Entities;
 using Ngila.Api.Models.Enums;
 using Ngila.Api.Services.Interfaces;
@@ -17,34 +16,25 @@ public class AuthService : IAuthService
     private const string GenericResetError = "Invalid or expired token.";
 
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly IEmailService _emailService;
-    private readonly INotificationService _notificationService;
-    private readonly IActivityLogService _activityLog;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
-        SignInManager<ApplicationUser> signInManager,
         RoleManager<IdentityRole<Guid>> roleManager,
         ApplicationDbContext context,
         ITokenService tokenService,
         IEmailService emailService,
-        INotificationService notificationService,
-        IActivityLogService activityLog,
         ILogger<AuthService> logger)
     {
         _userManager = userManager;
-        _signInManager = signInManager;
         _roleManager = roleManager;
         _context = context;
         _tokenService = tokenService;
         _emailService = emailService;
-        _notificationService = notificationService;
-        _activityLog = activityLog;
         _logger = logger;
     }
 
@@ -81,8 +71,7 @@ public class AuthService : IAuthService
             _context.CustomerProfiles.Add(new CustomerProfile { UserId = user.Id });
             await _context.SaveChangesAsync(ct);
         }
-        // Vendor: no VendorProfile created here - set up afterwards via PUT /api/vendors/me, or
-        // acquired all at once by claiming an existing unclaimed listing (ClaimVendorAsync).
+        // Vendor: no VendorProfile created here - set up afterwards via PUT /api/vendors/me.
 
         if (request.UserType == UserType.Admin)
         {
@@ -104,49 +93,6 @@ public class AuthService : IAuthService
             new MessageResponse("Registration successful. Please check your email to confirm your account."), 201);
     }
 
-    public async Task<ServiceResult<MessageResponse>> ClaimVendorAsync(Guid vendorId, ClaimVendorRequest request, CancellationToken ct = default)
-    {
-        var vendor = await _context.VendorProfiles.FirstOrDefaultAsync(v => v.Id == vendorId, ct);
-        if (vendor is null)
-            return ServiceResult<MessageResponse>.Failure("Vendor not found.", 404);
-
-        if (vendor.UserId is not null)
-            return ServiceResult<MessageResponse>.Failure("This vendor has already been claimed.", 409);
-
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
-
-        var createResult = await CreateUserAsync(
-            request.Email, request.FirstName, request.LastName, request.PhoneNumber, request.Password, request.Gender, Roles.Vendor);
-
-        if (!createResult.Succeeded || createResult.Data is null)
-            return ServiceResult<MessageResponse>.Failure(createResult.Error!, createResult.StatusCode);
-
-        var user = createResult.Data;
-
-        vendor.UserId = user.Id;
-        await _context.SaveChangesAsync(ct);
-
-        var confirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-        await transaction.CommitAsync(ct);
-
-        await _emailService.SendEmailConfirmationAsync(user.Email!, user.Id, confirmationToken, ct);
-
-        if (vendor.AddedByUserId is not null)
-        {
-            await _notificationService.NotifyAsync(
-                vendor.AddedByUserId.Value,
-                "Your suggested vendor was claimed!",
-                $"{vendor.BusinessName}, which you added to Ngila, has been claimed by its owner.",
-                vendor.Id,
-                ct);
-        }
-
-        await _activityLog.LogAsync(user.Id, $"claimed {vendor.BusinessName}", "vendor-claimed", ct);
-
-        return ServiceResult<MessageResponse>.Success(
-            new MessageResponse("Vendor claimed successfully. Please check your email to confirm your account."), 201);
-    }
-
     public async Task<ServiceResult<AuthResponse>> LoginAsync(LoginRequest request, string? ipAddress, CancellationToken ct = default)
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
@@ -162,18 +108,27 @@ public class AuthService : IAuthService
             return ServiceResult<AuthResponse>.Failure(GenericLoginError, 401);
         }
 
-        var signInResult = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
-
-        if (signInResult.IsLockedOut)
+        if (await _userManager.IsLockedOutAsync(user))
         {
             return ServiceResult<AuthResponse>.Failure(
                 "Account temporarily locked due to multiple failed login attempts. Please try again later.", 423);
         }
 
-        if (!signInResult.Succeeded)
+        // Checking the password directly via UserManager rather than
+        // SignInManager.CheckPasswordSignInAsync deliberately: that method's PreSignInCheck runs
+        // the RequireConfirmedEmail gate *before* verifying the password, so an unconfirmed
+        // account with the *correct* password would fail with SignInResult.NotAllowed and get
+        // reported here as the generic "Invalid email or password" - hiding the real, fixable
+        // reason. Checking the password first preserves that generic message for genuinely wrong
+        // passwords (no account-enumeration change - a wrong password looks identical either way)
+        // while giving a confirmed-wrong-password holder the accurate "confirm your email" reason.
+        if (!await _userManager.CheckPasswordAsync(user, request.Password))
         {
+            await _userManager.AccessFailedAsync(user);
             return ServiceResult<AuthResponse>.Failure(GenericLoginError, 401);
         }
+
+        await _userManager.ResetAccessFailedCountAsync(user);
 
         if (!user.EmailConfirmed)
         {
