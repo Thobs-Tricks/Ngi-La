@@ -332,8 +332,7 @@ export default function DiscoverScreen({
                         styles.mapButton,
                         {
                             borderColor: theme.colors.border,
-                            backgroundColor:
-                                theme.colors.card,
+                            backgroundColor: theme.colors.card,
                             opacity: pressed ? 0.7 : 1,
                         },
                     ]}
@@ -348,8 +347,7 @@ export default function DiscoverScreen({
                         style={[
                             styles.mapButtonText,
                             {
-                                color:
-                                    theme.colors.foreground,
+                                color: theme.colors.foreground,
                             },
                         ]}
                     >

@@ -36,9 +36,10 @@ public static class DbSeeder
         await SeedFeedPostsAsync(context, logger);
         await SeedNotificationsAsync(context, logger);
 
-        // These three run on every startup, not just against an empty table - each one tops up
+        // These four run on every startup, not just against an empty table - each one tops up
         // or resyncs whatever's missing rather than bailing out early, so they also backfill
         // real (non-seed) vendors/posts/customers created through ordinary use of the app.
+        await EnsureVendorFeedPostsAsync(context, logger);
         await SeedReviewsAsync(context, logger);
         await SeedFeedEngagementAsync(context, logger);
         await ConfirmAllCustomerEmailsAsync(context, logger);
@@ -112,9 +113,9 @@ public static class DbSeeder
         return existing;
     }
 
-    // The 7 Unsplash photo IDs below are the only ones ever verified to load correctly for this
-    // project - reused (not duplicated with new, unverified IDs) as both a vendor's main image
-    // and its feed posts' photos, for every vendor added here.
+    // Every Unsplash photo ID below was checked with a live HTTP request before being added here -
+    // reused (not duplicated with new, unverified IDs) as both a vendor's main image and its feed
+    // posts' photos, for every vendor added here.
     private static readonly string[] StockImages =
     {
         "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=80",
@@ -124,7 +125,191 @@ public static class DbSeeder
         "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
         "https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=800&q=80",
         "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1518843875459-f738682238a6?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1506806732259-39c2d0268443?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1542353436-312f0e1f67ff?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1560243563-062bfc001d68?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1590874103328-eac38a683ce7?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1592878849122-facb97520f9e?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1583744946564-b52ac1c389c8?auto=format&fit=crop&w=800&q=80",
+        "https://images.unsplash.com/photo-1533900298318-6b8da08a523e?auto=format&fit=crop&w=800&q=80",
     };
+
+    // Used only to seed more vendor/customer owner names below - not the categories list itself,
+    // which stays whatever SeedCategoriesAsync created.
+    private static readonly string[] CategoryNames =
+        { "Food", "Fresh Produce", "Clothing", "Barber", "Repairs", "Car Wash", "Accessories" };
+
+    private static readonly string[] OwnerFirstNames =
+    {
+        "Thabo", "Sipho", "Nomvula", "Palesa", "Zanele", "Bongani", "Lindiwe", "Kagiso", "Naledi", "Tumi",
+        "Ayanda", "Karabo", "Refilwe", "Lerato", "Mpho", "Zinhle", "Katlego", "Boitumelo", "Sibusiso", "Nokuthula",
+        "Themba", "Precious", "Andile", "Given", "Thandi", "Patricia", "Lucky", "Vusi", "Sello", "Joyce",
+        "Vusumuzi", "Nonhlanhla", "Sizwe", "Bhekani", "Nomsa", "Fikile", "Musa", "Nqobile", "Gugu", "Sabelo",
+    };
+
+    private static readonly string[] OwnerLastNames =
+    {
+        "Ndlovu", "Sithole", "Mahlangu", "Radebe", "Zulu", "Dlamini", "Ngwenya", "Mabaso", "Tshabalala", "Mnisi",
+        "Khumalo", "Molefe", "Nkosi", "Dube", "Mokoena", "Mthembu", "Cele", "Mkhize", "Buthelezi", "Zwane",
+        "Shabalala", "Mahlaba", "Mokgadi", "Sibiya", "Ngcobo", "Xaba", "Gumede", "Mahlobo", "Mazibuko", "Ngubane",
+    };
+
+    private static readonly Dictionary<string, string[]> BusinessNameTemplates = new()
+    {
+        ["Food"] = new[] { "{0}'s Kitchen", "{0} Shisanyama", "Mama {0}'s Kota Spot", "{0} Vetkoek Corner", "{1} Street Food", "{0}'s Diner", "{0} Braai House" },
+        ["Fresh Produce"] = new[] { "{0} Fresh Produce", "{1}'s Grocer", "Green Corner {1}", "{0} Fruit & Veg", "{1} Farm Stall" },
+        ["Clothing"] = new[] { "{0} Streetwear", "{1} Fashion House", "{0}'s Boutique", "{1} Threads", "{0} Style Studio" },
+        ["Barber"] = new[] { "{0}'s Barber", "Fade Masters {1}", "{0} Cuts", "{1} Grooming Lounge", "{0} Barbershop" },
+        ["Repairs"] = new[] { "{0} Repairs", "{1} Phone Clinic", "{0} Shoe & Leather Repairs", "{1} Fix-It Corner", "{0} Tech Repairs" },
+        ["Car Wash"] = new[] { "{0} Wash Bay", "Sparkle {1} Car Wash", "{0} Mobile Wash", "Shine Bright {1}", "{0} Auto Spa" },
+        ["Accessories"] = new[] { "{0} Airtime & Accessories", "{1} Data Corner", "{0} Mobile Accessories", "{1} SIM & Data Hub", "{0} Tech Accessories" },
+    };
+
+    private static readonly Dictionary<string, string[]> BusinessDescriptionTemplates = new()
+    {
+        ["Food"] = new[]
+        {
+            "Authentic homemade meals and traditional favourites prepared fresh every day.",
+            "Braai and shisanyama plates cooked over open coals every evening.",
+            "Loaded kotas and amagwinya, a firm favourite with the lunch crowd.",
+            "Freshly fried vetkoek and stews, a neighbourhood institution.",
+            "Home-style cooking served hot, fast and affordable.",
+        },
+        ["Fresh Produce"] = new[]
+        {
+            "Fresh fruit and vegetables sourced from local farmers and sold at affordable prices.",
+            "A neighbourhood grocer stocking fresh vegetables, fruit and pantry staples.",
+            "Daily deliveries of fresh produce at prices that beat the big stores.",
+            "Quality fruit and veg, restocked fast to stay fresh all week.",
+        },
+        ["Clothing"] = new[]
+        {
+            "Locally sourced streetwear, sneakers and accessories at street prices.",
+            "Tailored and ready-to-wear fashion for every occasion.",
+            "Trendy fits and everyday wear at prices that don't break the bank.",
+            "Quality fabrics and custom tailoring for the whole family.",
+        },
+        ["Barber"] = new[]
+        {
+            "Professional cuts, fades and grooming services from experienced local barbers.",
+            "Sharp fades, line-ups and beard grooming from a team of skilled barbers.",
+            "Walk-ins welcome for a clean cut any day of the week.",
+            "Classic and modern cuts, always finished with a hot towel shave.",
+        },
+        ["Repairs"] = new[]
+        {
+            "Affordable shoe repairs, restoration and maintenance for all types of footwear.",
+            "Same-day screen, battery and charging port repairs for most phone models.",
+            "Quick, reliable fixes for phones, shoes and small appliances.",
+            "Honest repair work with a warranty on every job.",
+        },
+        ["Car Wash"] = new[]
+        {
+            "Convenient mobile car wash services brought directly to your location.",
+            "Full interior and exterior car washes with a 30-minute turnaround.",
+            "Hand washes and detailing that keep your car looking brand new.",
+            "Quick, thorough washes at prices that beat the drive-through.",
+        },
+        ["Accessories"] = new[]
+        {
+            "Airtime, data, phone accessories and everyday mobile essentials.",
+            "Airtime, data bundles and SIM swaps for every network.",
+            "Chargers, earphones and phone cases at unbeatable prices.",
+            "Your one-stop shop for everyday mobile essentials.",
+        },
+    };
+
+    // Generates a batch of vendor seeds spread across one geographic area - used to add a second,
+    // independently dense "market" cluster (e.g. Alexandra) distinct from the original Braamfontein
+    // seeds, plus a top-up batch for Braamfontein itself. emailIndexStart must not overlap between
+    // calls, or two batches would generate the same demo email and one would silently be skipped.
+    private static List<DemoVendorSeed> GenerateVendorSeeds(
+        int count, int emailIndexStart, string areaLabel, double centerLat, double centerLng, double spread)
+    {
+        var results = new List<DemoVendorSeed>(count);
+
+        for (var i = 0; i < count; i++)
+        {
+            var globalIndex = emailIndexStart + i;
+            var firstName = OwnerFirstNames[globalIndex % OwnerFirstNames.Length];
+            var lastName = OwnerLastNames[(globalIndex * 7 + 3) % OwnerLastNames.Length];
+            var category = CategoryNames[globalIndex % CategoryNames.Length];
+
+            var nameTemplates = BusinessNameTemplates[category];
+            var businessName = string.Format(nameTemplates[globalIndex % nameTemplates.Length], firstName, lastName);
+
+            var descriptions = BusinessDescriptionTemplates[category];
+            var description = descriptions[(globalIndex / CategoryNames.Length) % descriptions.Length];
+
+            var email = $"v{globalIndex}.{firstName.ToLowerInvariant()}.{lastName.ToLowerInvariant()}@ngila.demo";
+
+            var latJitter = (Rng.NextDouble() * 2 - 1) * spread;
+            var lngJitter = (Rng.NextDouble() * 2 - 1) * spread;
+            var status = Rng.NextDouble() < 0.7 ? VendorStatus.Verified : VendorStatus.PendingVerification;
+            var image = StockImages[Rng.Next(StockImages.Length)];
+            var openingTime = new TimeSpan(6 + Rng.Next(0, 4), Rng.Next(0, 2) * 30, 0);
+            var closingTime = new TimeSpan(16 + Rng.Next(0, 5), 0, 0);
+
+            results.Add(new DemoVendorSeed(
+                firstName, lastName, email,
+                businessName, description,
+                category, areaLabel,
+                (decimal)(centerLat + latJitter), (decimal)(centerLng + lngJitter),
+                openingTime, closingTime, status, image));
+        }
+
+        return results;
+    }
+
+    private static readonly string[] CustomerFirstNames =
+    {
+        "Thabo", "Nomusa", "Sipho", "Naledi", "Palesa", "Tumi", "Ayanda", "Karabo", "Refilwe", "Lerato",
+        "Mpho", "Zinhle", "Katlego", "Boitumelo", "Sibusiso", "Nokuthula", "Themba", "Precious", "Nomvula", "Bongani",
+        "Lindiwe", "Kagiso", "Vusi", "Sello", "Joyce", "Andile", "Given", "Thandi", "Patricia", "Lucky",
+        "Vusumuzi", "Nonhlanhla", "Sizwe", "Bhekani", "Nomsa", "Fikile", "Musa", "Nqobile", "Gugu", "Sabelo",
+        "Amahle", "Dumisani", "Ntombi", "Siyabonga", "Xolani", "Pretty", "Mandla", "Nozipho", "Bafana", "Zodwa",
+    };
+
+    private static readonly string[] CustomerLastNames =
+    {
+        "Molefe", "Khumalo", "Nkosi", "Dube", "Mokoena", "Sithole", "Zulu", "Mahlangu", "Dlamini", "Radebe",
+        "Ngwenya", "Mabaso", "Tshabalala", "Mnisi", "Ndlovu", "Mthembu", "Cele", "Mkhize", "Buthelezi", "Zwane",
+        "Shabalala", "Mahlaba", "Mokgadi", "Sibiya", "Ngcobo", "Xaba", "Gumede", "Mahlobo", "Mazibuko", "Ngubane",
+    };
+
+    // Generates a batch of customer seeds - names repeat across the pool (real customer bases have
+    // plenty of same-name people too), but every email is unique via its index prefix.
+    private static List<(string FirstName, string LastName, string Email)> GenerateCustomerSeeds(
+        int count, int emailIndexStart)
+    {
+        var results = new List<(string, string, string)>(count);
+
+        for (var i = 0; i < count; i++)
+        {
+            var globalIndex = emailIndexStart + i;
+            var firstName = CustomerFirstNames[globalIndex % CustomerFirstNames.Length];
+            var lastName = CustomerLastNames[(globalIndex * 11 + 5) % CustomerLastNames.Length];
+            var email = $"c{globalIndex}.{firstName.ToLowerInvariant()}.{lastName.ToLowerInvariant()}@ngila.demo";
+            results.Add((firstName, lastName, email));
+        }
+
+        return results;
+    }
 
     private static async Task SeedDemoVendorsAndCustomersAsync(
         ApplicationDbContext context,
@@ -214,7 +399,13 @@ public static class DbSeeder
                 "Mama Thandi's Kota Spot", "Loaded kotas and amagwinya, a favourite lunch stop for students nearby.",
                 "Food", "Braamfontein, Johannesburg", -26.1930m, 28.0285m,
                 new TimeSpan(7, 0, 0), new TimeSpan(16, 0, 0), VendorStatus.Verified, StockImages[1]),
-        };
+        }
+        // 20 more Braamfontein vendors (denser original market) plus 45 in Alexandra - a second,
+        // independent trading hub roughly 9km east of Braamfontein - to get the total up to ~80
+        // and give the admin density/gap map a real second cluster to compare against.
+        .Concat(GenerateVendorSeeds(20, 1000, "Braamfontein, Johannesburg", -26.1930, 28.0325, 0.010))
+        .Concat(GenerateVendorSeeds(45, 2000, "Alexandra, Johannesburg", -26.1030, 28.1023, 0.010))
+        .ToArray();
 
         foreach (var seed in vendorSeeds)
         {
@@ -279,7 +470,11 @@ public static class DbSeeder
             ("Nokuthula", "Khumalo", "nokuthula.khumalo@ngila.demo"),
             ("Themba", "Molefe", "themba.molefe@ngila.demo"),
             ("Precious", "Sithole", "precious.sithole@ngila.demo"),
-        };
+        }
+        // Tops the customer base up to ~200 - reviews/likes/comments scale automatically from
+        // this pool since SeedReviewsAsync/SeedFeedEngagementAsync draw from every non-admin user.
+        .Concat(GenerateCustomerSeeds(182, 3000))
+        .ToArray();
 
         foreach (var (firstName, lastName, email) in customerSeeds)
         {
@@ -386,6 +581,89 @@ public static class DbSeeder
             added, skipped);
     }
 
+    private static readonly string[] FeedPostTemplates =
+    {
+        "Just discovered {0} and I'm impressed!",
+        "{0} never disappoints, highly recommend.",
+        "Fresh find: {0} is worth the trip.",
+        "Been coming to {0} for weeks now, love it.",
+        "If you haven't tried {0} yet, you're missing out.",
+        "{0} is quickly becoming my favourite spot.",
+        "Shoutout to {0} for the great service today.",
+        "Found my new go-to at {0}.",
+        "{0} came through again, no complaints here.",
+        "Stopped by {0} on a whim, glad I did.",
+        "Reliable as always over at {0}.",
+        "{0} is proof this area has real hidden gems.",
+    };
+
+    private static readonly string[] FeedAuthorDisplayRoles =
+        { "Community Scout", "Local Explorer", "Vendor Rep", "Neighbourhood Regular" };
+
+    // Tops up any vendor with fewer than 2 real feed posts - the hardcoded postSeeds above only
+    // cover the original 19 vendors by name, so this fills in the rest of the (now much larger)
+    // vendor pool and keeps working as new vendors get added through ordinary use of the app.
+    // Content embeds the vendor's own business name, so it stays unique per vendor+template pair
+    // without needing a separate idempotency flag.
+    private static async Task EnsureVendorFeedPostsAsync(ApplicationDbContext context, ILogger logger)
+    {
+        var authorIds = await GetNonAdminUserIdsAsync(context);
+        if (authorIds.Count == 0)
+            return;
+
+        var vendors = await context.VendorProfiles.ToListAsync();
+        if (vendors.Count == 0)
+            return;
+
+        var postCountByVendor = await context.FeedPosts
+            .Where(p => p.VendorId != null)
+            .GroupBy(p => p.VendorId!.Value)
+            .Select(g => new { VendorId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.VendorId, x => x.Count);
+
+        var existingContent = (await context.FeedPosts.Select(p => p.Content).ToListAsync()).ToHashSet();
+        var now = DateTime.UtcNow;
+        var added = 0;
+
+        foreach (var vendor in vendors)
+        {
+            var currentCount = postCountByVendor.GetValueOrDefault(vendor.Id);
+            if (currentCount >= 2)
+                continue;
+
+            var eligibleAuthors = authorIds.Where(id => id != vendor.UserId).ToList();
+            if (eligibleAuthors.Count == 0)
+                continue;
+
+            for (var i = currentCount; i < 2; i++)
+            {
+                var template = FeedPostTemplates[Rng.Next(FeedPostTemplates.Length)];
+                var content = string.Format(template, vendor.BusinessName);
+                if (!existingContent.Add(content))
+                    continue;
+
+                context.FeedPosts.Add(new FeedPost
+                {
+                    AuthorUserId = eligibleAuthors[Rng.Next(eligibleAuthors.Count)],
+                    AuthorDisplayRole = FeedAuthorDisplayRoles[Rng.Next(FeedAuthorDisplayRoles.Length)],
+                    Content = content,
+                    VendorId = vendor.Id,
+                    CreatedAt = now.AddMinutes(-Rng.Next(30, 20000)),
+                    Photos = vendor.ImageUrl is null
+                        ? new List<FeedPostPhoto>()
+                        : new List<FeedPostPhoto> { new() { Url = vendor.ImageUrl, SortOrder = 0 } },
+                });
+                added++;
+            }
+        }
+
+        if (added == 0)
+            return;
+
+        await context.SaveChangesAsync();
+        logger.LogInformation("Topped up {Count} additional demo feed posts across the vendor pool.", added);
+    }
+
     private static async Task SeedNotificationsAsync(ApplicationDbContext context, ILogger logger)
     {
         if (await context.Notifications.AnyAsync())
@@ -442,6 +720,16 @@ public static class DbSeeder
         "A bit of a wait but worth it in the end.",
         "My new go-to spot in the area.",
         "Solid prices for the quality you get.",
+        "Friendly service and never disappoints.",
+        "Been a customer for months, still impressed.",
+        "Recommended this to half my neighbourhood already.",
+        "Good value, and the owner remembers regulars.",
+        "Consistent quality visit after visit.",
+        "Small operation but they get it right every time.",
+        "Better than most of the bigger places nearby.",
+        "Honestly one of the better finds in this area.",
+        "Would give six stars if I could.",
+        null,
         null,
         null,
     };
@@ -525,6 +813,14 @@ public static class DbSeeder
         "Thanks for sharing, needed this today.",
         "Underrated spot for real.",
         "Love supporting local like this.",
+        "Been meaning to check this out, thanks for the reminder.",
+        "This is exactly the kind of post I follow this feed for.",
+        "Can confirm, this place is worth it.",
+        "Saving this for later, looks great.",
+        "My friends need to see this.",
+        "Local businesses need more love like this.",
+        "Will be stopping by this week.",
+        "This made my day, thank you for sharing.",
     };
 
     // Tops up any post with fewer than 5 real likes or 2 real comments, then recomputes every

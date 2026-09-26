@@ -15,7 +15,12 @@
         "backgroundColor": "#F8EFDF",
         "foregroundImage": "./assets/icon-mark.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "backgroundColor": "#FDF9F0"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#FDF9F0",
+      "translucent": false
     },
     "web": {
       "favicon": "./assets/icon-mark-opaque.png"
