@@ -315,8 +315,10 @@ public static class DbSeeder
 
     private static async Task SeedFeedPostsAsync(ApplicationDbContext context, ILogger logger)
     {
-        if (await context.FeedPosts.AnyAsync())
-            return;
+        // Per-post (not per-table) idempotency check - content is unique across postSeeds below,
+        // so this tops up newly added posts on redeploy instead of bailing out entirely just
+        // because earlier posts already exist from a previous run.
+        var existingContent = (await context.FeedPosts.Select(p => p.Content).ToListAsync()).ToHashSet();
 
         var usersByEmail = await context.Users
             .Where(u => u.Email!.EndsWith("@ngila.demo"))
@@ -349,15 +351,20 @@ public static class DbSeeder
 
         var now = DateTime.UtcNow;
         var skipped = 0;
+        var added = 0;
 
         foreach (var (authorEmail, vendorName, role, content, minutesAgo) in postSeeds)
         {
+            if (existingContent.Contains(content))
+                continue;
+
             if (!usersByEmail.TryGetValue(authorEmail, out var author) || !vendorsByName.TryGetValue(vendorName, out var vendor))
             {
                 skipped++;
                 continue;
             }
 
+            added++;
             context.FeedPosts.Add(new FeedPost
             {
                 AuthorUserId = author.Id,
@@ -376,7 +383,7 @@ public static class DbSeeder
 
         await context.SaveChangesAsync();
         logger.LogInformation("Seeded {Count} demo feed posts ({Skipped} skipped - missing author/vendor).",
-            postSeeds.Length - skipped, skipped);
+            added, skipped);
     }
 
     private static async Task SeedNotificationsAsync(ApplicationDbContext context, ILogger logger)
