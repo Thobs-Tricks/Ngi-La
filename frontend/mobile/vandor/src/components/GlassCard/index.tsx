@@ -21,11 +21,11 @@ export default function GlassCard({
 }: GlassCardProps) {
   return (
     <View
-      className={`overflow-hidden rounded-3xl border border-white/40 ${className}`}
+      className={`overflow-hidden rounded-2xl border border-white/40 ${className}`}
       style={[styles.shadow, style]}
       {...rest}
     >
-      <BlurView intensity={intensity} tint={tint} className="p-5">
+      <BlurView intensity={intensity} tint={tint} className="p-4">
         {children}
       </BlurView>
     </View>

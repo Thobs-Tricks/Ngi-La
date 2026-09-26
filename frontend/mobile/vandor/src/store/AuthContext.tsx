@@ -12,7 +12,10 @@ interface AuthContextValue {
   isSubmitting: boolean;
   error: string | null;
   login: (payload: LoginPayload) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
+  /** Resolves with the API's confirmation message. Does NOT log the user
+   * in — /auth/register only creates the account; the person still has to
+   * confirm their email and then log in separately. */
+  register: (payload: RegisterPayload) => Promise<string>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -43,7 +46,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsSubmitting(true);
     setError(null);
     try {
-      const next = await authApi.login(payload);
+      let next = await authApi.login(payload);
+
+      // /auth/login doesn't return phoneNumber/gender — fill those (and
+      // confirm everything else) from /auth/me. Soft-fails: a /me hiccup
+      // shouldn't block a successful login.
+      const me = await authApi.getCurrentUser(next.accessToken);
+      if (me) next = { ...next, user: { ...next.user, ...me } };
+
       await saveSession(next);
       setSession(next);
     } catch (e) {
@@ -58,9 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsSubmitting(true);
     setError(null);
     try {
-      const next = await authApi.register(payload);
-      await saveSession(next);
-      setSession(next);
+      const result = await authApi.register(payload);
+      return result.message;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
       throw e;

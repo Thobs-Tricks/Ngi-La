@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useThemeColors } from '../../styles/theme';
 
 interface CheckboxProps {
   checked: boolean;
@@ -9,6 +10,7 @@ interface CheckboxProps {
 }
 
 export default function Checkbox({ checked, onChange, label }: CheckboxProps) {
+  const colors = useThemeColors();
   return (
     <Pressable onPress={() => onChange(!checked)} className="flex-row items-start gap-3 py-1">
       <View
@@ -16,7 +18,7 @@ export default function Checkbox({ checked, onChange, label }: CheckboxProps) {
           checked ? 'border-primary bg-primary' : 'border-border bg-card'
         }`}
       >
-        {checked && <Feather name="check" size={13} color="#FEFAF1" />}
+        {checked && <Feather name="check" size={13} color={colors.primaryForeground} />}
       </View>
       <Text className="flex-1 text-sm leading-5 text-foreground">{label}</Text>
     </Pressable>

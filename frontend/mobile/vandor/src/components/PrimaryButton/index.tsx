@@ -1,7 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, Text } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { gradients } from '../../styles/theme';
+import { useThemeColors } from '../../styles/theme';
 
 interface PrimaryButtonProps {
   label: string;
@@ -19,18 +18,19 @@ export default function PrimaryButton({
   variant = 'solid',
 }: PrimaryButtonProps) {
   const isDisabled = disabled || loading;
+  const colors = useThemeColors();
 
   if (variant === 'outline') {
     return (
       <Pressable
         onPress={onPress}
         disabled={isDisabled}
-        className={`items-center justify-center rounded-2xl border border-primary py-4 ${
+        className={`items-center justify-center rounded-xl border border-primary py-3.5 ${
           isDisabled ? 'opacity-50' : ''
         }`}
       >
         {loading ? (
-          <ActivityIndicator color="#C64E26" />
+          <ActivityIndicator color={colors.primary} />
         ) : (
           <Text className="text-base font-semibold text-primary">{label}</Text>
         )}
@@ -39,20 +39,16 @@ export default function PrimaryButton({
   }
 
   return (
-    <Pressable onPress={onPress} disabled={isDisabled} className={isDisabled ? 'opacity-50' : ''}>
-      <LinearGradient
-        colors={gradients.sunset}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ borderRadius: 16 }}
-        className="items-center justify-center py-4"
-      >
-        {loading ? (
-          <ActivityIndicator color="#FEFAF1" />
-        ) : (
-          <Text className="text-base font-semibold text-primary-foreground">{label}</Text>
-        )}
-      </LinearGradient>
+    <Pressable
+      onPress={onPress}
+      disabled={isDisabled}
+      className={`items-center justify-center rounded-xl bg-primary py-3.5 ${isDisabled ? 'opacity-50' : ''}`}
+    >
+      {loading ? (
+        <ActivityIndicator color={colors.primaryForeground} />
+      ) : (
+        <Text className="text-base font-semibold text-primary-foreground">{label}</Text>
+      )}
     </Pressable>
   );
 }
