@@ -32,7 +32,11 @@ public class VendorProfile
     public TimeSpan? OpeningTime { get; set; }
     public TimeSpan? ClosingTime { get; set; }
 
+    // The main listing photo - shown in discovery/search results and cards.
     public string? ImageUrl { get; set; }
+
+    // Extra gallery photos beyond the main one. Max 5, enforced in VendorService.
+    public ICollection<VendorProfilePhoto> Photos { get; set; } = new List<VendorProfilePhoto>();
 
     // Fallback contact number for a listing nobody has claimed yet (no owning User to read a
     // phone number from). Once claimed, the owner's own ApplicationUser.PhoneNumber takes over.
@@ -45,4 +49,15 @@ public class VendorProfile
     public int ReviewsCount { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class VendorProfilePhoto
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid VendorProfileId { get; set; }
+    public VendorProfile VendorProfile { get; set; } = default!;
+
+    public string Url { get; set; } = default!;
+    public int SortOrder { get; set; }
 }

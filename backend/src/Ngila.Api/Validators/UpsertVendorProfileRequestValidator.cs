@@ -17,5 +17,7 @@ public class UpsertVendorProfileRequestValidator : AbstractValidator<UpsertVendo
             .Must(url => Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
             .When(x => !string.IsNullOrWhiteSpace(x.ImageUrl))
             .WithMessage("ImageUrl must be a valid absolute http(s) URL.");
+        RuleFor(x => x.PhotoUrls).Must(urls => urls is null || urls.Count <= 5)
+            .WithMessage("You can add up to 5 photos.");
     }
 }

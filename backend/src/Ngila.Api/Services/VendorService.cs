@@ -119,6 +119,7 @@ public class VendorService : IVendorService
         var vendor = await _context.VendorProfiles
             .Include(v => v.User)
             .Include(v => v.Category)
+            .Include(v => v.Photos)
             .FirstOrDefaultAsync(v => v.UserId == userId, ct);
 
         if (vendor is null)
@@ -133,9 +134,13 @@ public class VendorService : IVendorService
         if (!categoryExists)
             return ServiceResult<VendorResponse>.Failure("Selected category does not exist.", 400);
 
+        if (request.PhotoUrls is { Count: > 5 })
+            return ServiceResult<VendorResponse>.Failure("You can add up to 5 photos.", 400);
+
         var vendor = await _context.VendorProfiles
             .Include(v => v.User)
             .Include(v => v.Category)
+            .Include(v => v.Photos)
             .FirstOrDefaultAsync(v => v.UserId == userId, ct);
 
         var isNew = vendor is null;
@@ -154,6 +159,21 @@ public class VendorService : IVendorService
         vendor.OpeningTime = request.OpeningTime;
         vendor.ClosingTime = request.ClosingTime;
         vendor.ImageUrl = request.ImageUrl;
+
+        // Full replace, same PUT semantics as every other field here - resend the whole gallery
+        // each time, not a diff/patch. Adding straight to the DbSet (not just vendor.Photos) is
+        // deliberate: these entities already carry a non-default Guid Id (set by the entity's own
+        // constructor), and when EF only discovers them via navigation-collection fixup on an
+        // already-tracked parent, it assumes a non-default key means "existing row" and marks
+        // them Modified instead of Added - producing UPDATEs that hit zero rows. Adding via the
+        // DbSet directly forces Added state unambiguously regardless of the key's value.
+        if (vendor.Photos.Count > 0)
+            _context.VendorProfilePhotos.RemoveRange(vendor.Photos);
+        vendor.Photos.Clear();
+        var newPhotos = (request.PhotoUrls ?? Array.Empty<string>())
+            .Select((url, index) => new VendorProfilePhoto { VendorProfileId = vendor.Id, Url = url, SortOrder = index })
+            .ToList();
+        _context.VendorProfilePhotos.AddRange(newPhotos);
 
         await _context.SaveChangesAsync(ct);
 
@@ -195,6 +215,7 @@ public class VendorService : IVendorService
         var vendor = await _context.VendorProfiles
             .Include(v => v.User)
             .Include(v => v.Category)
+            .Include(v => v.Photos)
             .FirstOrDefaultAsync(v => v.Id == vendorId, ct);
 
         if (vendor is null)
@@ -348,6 +369,7 @@ public class VendorService : IVendorService
         _context.VendorProfiles
             .Include(v => v.User)
             .Include(v => v.Category)
+            .Include(v => v.Photos)
             .Where(v => v.Status != VendorStatus.Suspended && (v.UserId == null || v.User!.EmailConfirmed));
 
     private static VendorResponse MapToResponse(VendorProfile vendor, decimal latitude, decimal longitude)
@@ -371,6 +393,7 @@ public class VendorService : IVendorService
             IsVerified: vendor.Status == VendorStatus.Verified,
             Claimed: vendor.UserId is not null,
             Image: vendor.ImageUrl,
+            Photos: vendor.Photos.OrderBy(p => p.SortOrder).Select(p => p.Url).ToList(),
             Phone: vendor.User?.PhoneNumber ?? vendor.ContactPhone,
             Hours: DisplayFormatting.FormatHours(vendor.OpeningTime, vendor.ClosingTime));
     }

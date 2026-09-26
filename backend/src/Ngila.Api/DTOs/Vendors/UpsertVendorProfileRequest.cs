@@ -11,4 +11,5 @@ public record UpsertVendorProfileRequest(
     decimal? Longitude,
     TimeSpan? OpeningTime,
     TimeSpan? ClosingTime,
-    string? ImageUrl);
+    string? ImageUrl,
+    IReadOnlyList<string>? PhotoUrls);

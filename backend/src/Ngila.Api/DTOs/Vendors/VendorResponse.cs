@@ -15,5 +15,6 @@ public record VendorResponse(
     bool IsVerified,
     bool Claimed,
     string? Image,
+    IReadOnlyList<string> Photos,
     string? Phone,
     string Hours);

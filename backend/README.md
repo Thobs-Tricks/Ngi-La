@@ -40,6 +40,9 @@ reference, indexes, and the reasoning behind the auth-related design decisions).
    dotnet user-secrets set "Jwt:Secret" "<a random 48+ byte base64 string>"
    dotnet user-secrets set "AdminBootstrap:Email" "you@example.com"
    dotnet user-secrets set "AdminBootstrap:Password" "SomeStrong!Passw0rd"
+   dotnet user-secrets set "Cloudinary:CloudName" "..."   # optional - only needed to test media upload
+   dotnet user-secrets set "Cloudinary:ApiKey" "..."
+   dotnet user-secrets set "Cloudinary:ApiSecret" "..."
    ```
 
    Generate a secret: `openssl rand -base64 48`
@@ -180,6 +183,40 @@ These back the customer app's "+ Add Vendor", "Rate Vendor" and notification-bel
 
 A vendor's `phone` in discovery responses is its owner's `PhoneNumber` once claimed, falling back
 to the `contactPhone` supplied when it was community-added.
+
+## Media (photos)
+
+Images only, no video. Backed by Cloudinary, not Azure Blob Storage — this subscription's Azure
+policy disallows the `Microsoft.Storage` provider, and the SQL free tier (32MB) can't hold real
+files.
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `POST /api/media/upload` | Authenticated | `multipart/form-data`, field name `file`. jpg/jpeg/png/webp/gif, ≤10MB. Returns `{ url, resourceType }`. Call once per photo, then pass the returned URLs to the endpoints below |
+
+Configure `Cloudinary:CloudName`/`ApiKey`/`ApiSecret` (user-secrets locally, App Settings in
+Azure) — the *Cloud name*, not the key's label (Cloudinary's dashboard confusingly shows both).
+Until configured, uploads return `503` rather than failing the whole request.
+
+### Feed: posts, likes, comments
+
+| Endpoint | Auth | Notes |
+|---|---|---|
+| `POST /api/feed` | Authenticated | `{ content, vendorId?, photoUrls? }` — up to 5 `photoUrls`. `vendorId` tags a vendor stall on the post. `authorDisplayRole` is set server-side from the caller's actual role, not client-supplied |
+| `POST /api/feed/{id}/like` | Authenticated | Toggles - liking an already-liked post unlikes it. Returns `{ liked, likesCount }` |
+| `GET /api/feed/{id}/comments` | Public | Oldest first |
+| `POST /api/feed/{id}/comments` | Authenticated | `{ content }` |
+
+`GET /api/feed` includes `likedByMe` per post — `false` for anonymous callers, otherwise whether
+the caller has liked it.
+
+### Vendor profile photos
+
+`PUT /api/vendors/me` (`UpsertVendorProfileRequest`) gained `photoUrls` (up to 5) alongside the
+existing single `imageUrl` (the main listing photo). Full replace each call, same as every other
+field on this endpoint — resend the whole gallery, not a diff. Category selection and profile
+editing were already supported by this same endpoint (`categoryId` from `GET /api/categories`,
+re-`PUT` to edit).
 
 ## Admin console
 

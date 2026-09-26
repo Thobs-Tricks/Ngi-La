@@ -16,6 +16,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<FeedPost> FeedPosts => Set<FeedPost>();
+    public DbSet<FeedPostPhoto> FeedPostPhotos => Set<FeedPostPhoto>();
+    public DbSet<FeedPostLike> FeedPostLikes => Set<FeedPostLike>();
+    public DbSet<FeedPostComment> FeedPostComments => Set<FeedPostComment>();
+    public DbSet<VendorProfilePhoto> VendorProfilePhotos => Set<VendorProfilePhoto>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Report> Reports => Set<Report>();
@@ -81,6 +85,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(v => v.AddedByUserId);
         });
 
+        builder.Entity<VendorProfilePhoto>(entity =>
+        {
+            entity.Property(p => p.Url).HasMaxLength(2048).IsRequired();
+
+            entity.HasOne(p => p.VendorProfile)
+                .WithMany(v => v.Photos)
+                .HasForeignKey(p => p.VendorProfileId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(p => p.VendorProfileId);
+        });
+
         builder.Entity<CustomerProfile>(entity =>
         {
             entity.HasOne(c => c.User)
@@ -115,6 +131,54 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(f => f.CreatedAt);
+        });
+
+        builder.Entity<FeedPostPhoto>(entity =>
+        {
+            entity.Property(p => p.Url).HasMaxLength(2048).IsRequired();
+
+            entity.HasOne(p => p.FeedPost)
+                .WithMany(f => f.Photos)
+                .HasForeignKey(p => p.FeedPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(p => p.FeedPostId);
+        });
+
+        builder.Entity<FeedPostLike>(entity =>
+        {
+            entity.HasKey(l => new { l.FeedPostId, l.UserId });
+
+            entity.HasOne(l => l.FeedPost)
+                .WithMany()
+                .HasForeignKey(l => l.FeedPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict, not Cascade - alongside FeedPostId's cascade (FeedPost -> AuthorUserId ->
+            // AspNetUsers), a second cascading path straight from UserId to AspNetUsers would be
+            // the same "multiple cascade paths" conflict seen elsewhere in this schema.
+            entity.HasOne(l => l.User)
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<FeedPostComment>(entity =>
+        {
+            entity.Property(c => c.Content).HasMaxLength(500).IsRequired();
+
+            entity.HasOne(c => c.FeedPost)
+                .WithMany()
+                .HasForeignKey(c => c.FeedPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict for the same reason as FeedPostLike.User above.
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(c => c.FeedPostId);
         });
 
         builder.Entity<Review>(entity =>
