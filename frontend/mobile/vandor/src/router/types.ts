@@ -2,6 +2,7 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
+  Terms: undefined;
 };
 
 export type MainTabParamList = {
@@ -13,6 +14,8 @@ export type MainTabParamList = {
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   ChangePassword: undefined;
+  Reviews: undefined;
+  Terms: undefined;
 };
 
 export type MySpazaStackParamList = {

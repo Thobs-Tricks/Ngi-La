@@ -14,18 +14,31 @@ import TradingHoursEditor, { DEFAULT_TRADING_HOURS, DayHours } from '../../compo
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeColors } from '../../styles/theme';
 import { getCategories } from '../../api/categories';
-import { getMyProfile, upsertMyProfile } from '../../api/vendors';
-import { uploadNewImages } from '../../api/media';
-import { ApiError } from '../../api/client';
+import { getMyVendor, upsertMyVendor, updateTradingHours as putTradingHours, updatePhotos as putPromoPhotos } from '../../api/vendors';
+import { uploadMedia } from '../../api/media';
 import type { Category } from '../../types';
 import type { MySpazaStackParamList } from '../../router/types';
 
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
-const MAX_PROMO_PHOTOS = 5;
 
 function staticMapUrl(lat: number, lng: number, color: string) {
   const hex = color.replace('#', '0x');
   return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=640x260&scale=2&markers=color:${hex}%7C${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`;
+}
+
+// Confirmed live 2026-09: the trading-hours endpoint takes and returns plain
+// "HH:mm" (no seconds), and a closed day's openTime/closeTime come back as
+// null rather than a placeholder time.
+function toApiTime(time: string): string {
+  return time.slice(0, 5);
+}
+function fromApiTime(time: string | null, fallback: string): string {
+  if (!time) return fallback;
+  return time.slice(0, 5);
+}
+
+function isHostedUrl(uri: string): boolean {
+  return /^https?:\/\//i.test(uri);
 }
 
 export default function MySpazaScreen() {
@@ -33,10 +46,6 @@ export default function MySpazaScreen() {
   const route = useRoute<RouteProp<MySpazaStackParamList, 'MySpazaForm'>>();
   const { session } = useAuth();
   const colors = useThemeColors();
-  const accessToken = session?.accessToken;
-
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [hasProfile, setHasProfile] = useState(false);
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState('');
@@ -52,11 +61,25 @@ export default function MySpazaScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const [profileLoading, setProfileLoading] = useState(true);
+  // GET /vendors/me returns category display NAMES, not ids, so we stash
+  // them here and resolve to ids once the /categories list has loaded.
+  const [pendingCategoryNames, setPendingCategoryNames] = useState<string[] | null>(null);
+
+  const [rating, setRating] = useState(0);
+  const [reviewsCount, setReviewsCount] = useState(0);
+  const [isVerified, setIsVerified] = useState(false);
+  const [claimed, setClaimed] = useState(false);
+
   const [tradingHours, setTradingHours] = useState<DayHours[]>(DEFAULT_TRADING_HOURS);
+  const [hoursSaving, setHoursSaving] = useState(false);
+  const [hoursSaved, setHoursSaved] = useState(false);
+  const [hoursError, setHoursError] = useState<string | null>(null);
+
   const [promoPhotos, setPromoPhotos] = useState<string[]>([]);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoSaved, setPromoSaved] = useState(false);
-  const [isSavingPromo, setIsSavingPromo] = useState(false);
+  const [promoSaving, setPromoSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,56 +99,69 @@ export default function MySpazaScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pre-fills the form from the vendor's existing profile, if they already set one up -
-  // otherwise this is a blank "first time" form.
+  // Load the vendor's existing spaza profile, if one already exists, so this
+  // screen opens straight into the summary/edit view instead of a blank form.
   useEffect(() => {
-    if (!accessToken) return;
     let cancelled = false;
     (async () => {
+      if (!session?.accessToken) {
+        setProfileLoading(false);
+        return;
+      }
       try {
-        const profile = await getMyProfile(accessToken);
-        if (cancelled || !profile) return;
+        const vendor = await getMyVendor(session.accessToken);
+        if (cancelled || !vendor) return;
 
-        setHasProfile(true);
-        setBusinessName(profile.name);
-        setDescription(profile.description ?? '');
-        setLocationDescription(profile.locationDescription);
-        setContactPhone(profile.phone ?? '');
-        setImageUri(profile.image);
-        setPromoPhotos(profile.photos);
-        if (profile.latitude != null && profile.longitude != null) {
-          setCoords({ lat: profile.latitude, lng: profile.longitude });
+        setBusinessName(vendor.businessName);
+        setDescription(vendor.description);
+        // categoryIds comes back empty from GET (it only gives display
+        // names) — resolve names to ids once /categories has loaded.
+        if (vendor.categoryIds.length > 0) setSelectedCategoryIds(vendor.categoryIds);
+        else if (vendor.categoryNames.length > 0) setPendingCategoryNames(vendor.categoryNames);
+        setLocationDescription(vendor.locationDescription);
+        setContactPhone(vendor.contactPhone);
+        if (vendor.imageUrl) setImageUri(vendor.imageUrl);
+        if (vendor.latitude != null && vendor.longitude != null) {
+          setCoords({ lat: vendor.latitude, lng: vendor.longitude });
         }
-        if (profile.tradingHours.length > 0) {
-          // A closed day has null open/close times from the API - the editor still needs some
-          // string to show if the vendor flips it back open, so default to a sensible 08:00-18:00.
+        if (vendor.tradingHours.length > 0) {
           setTradingHours(
-            profile.tradingHours.map((h) => ({
+            vendor.tradingHours.map((h) => ({
               day: h.day,
               isOpen: h.isOpen,
-              openTime: h.openTime ?? '08:00',
-              closeTime: h.closeTime ?? '18:00',
+              openTime: fromApiTime(h.openTime, '08:00'),
+              closeTime: fromApiTime(h.closeTime, '18:00'),
             }))
           );
         }
-        setSelectedCategoryIds(
-          categories.length > 0
-            ? categories.filter((c) => profile.categories.includes(c.name)).map((c) => c.id)
-            : []
-        );
+        if (vendor.photoUrls.length > 0) setPromoPhotos(vendor.photoUrls);
+        setRating(vendor.rating);
+        setReviewsCount(vendor.reviewsCount);
+        setIsVerified(vendor.isVerified);
+        setClaimed(vendor.claimed);
         setSaved(true);
       } catch {
-        // Soft-fail - the vendor just sees a blank "set up your spaza" form instead.
+        // No profile yet (or a transient error) — leave the create form showing.
       } finally {
-        if (!cancelled) setIsLoadingProfile(false);
+        if (!cancelled) setProfileLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-    // Waits for categories so profile.categories (names) can be matched back to ids.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, categories.length]);
+  }, [session?.accessToken]);
+
+  // Resolve pending category names (from GET /vendors/me) to ids once the
+  // /categories list has loaded.
+  useEffect(() => {
+    if (!pendingCategoryNames || categories.length === 0) return;
+    const matched = categories
+      .filter((c) => pendingCategoryNames.some((name) => name.trim().toLowerCase() === c.name.trim().toLowerCase()))
+      .map((c) => c.id);
+    if (matched.length > 0) setSelectedCategoryIds(matched);
+    setPendingCategoryNames(null);
+  }, [pendingCategoryNames, categories]);
 
   // Picks up the pin dropped on the MapPicker screen when it navigates back
   // here with new params.
@@ -171,38 +207,6 @@ export default function MySpazaScreen() {
     }
   };
 
-  // Shared by both "Save Spaza" and "Save Promo Photos": the API takes the whole profile in one
-  // PUT, so anything editable on this screen (categories, hours, both photo sets) gets sent
-  // every time, not just the fields the button visually sits next to.
-  const saveProfile = async () => {
-    if (!accessToken) throw new ApiError('Your session has expired — please log in again.', 401);
-
-    const [uploadedImage] = imageUri ? await uploadNewImages([imageUri], accessToken) : [null];
-    const uploadedPromoPhotos = await uploadNewImages(promoPhotos, accessToken);
-
-    const profile = await upsertMyProfile(
-      {
-        businessName: businessName.trim(),
-        description: description.trim() || null,
-        categoryIds: selectedCategoryIds,
-        locationDescription: locationDescription.trim(),
-        latitude: coords?.lat ?? null,
-        longitude: coords?.lng ?? null,
-        contactPhone: contactPhone.trim() || null,
-        tradingHours,
-        imageUrl: uploadedImage,
-        photoUrls: uploadedPromoPhotos,
-      },
-      accessToken
-    );
-
-    // Reflect back whatever Cloudinary/the API actually stored (e.g. the uploaded URLs), so a
-    // second save doesn't re-upload photos that are already hosted.
-    setImageUri(profile.image);
-    setPromoPhotos(profile.photos);
-    setHasProfile(true);
-  };
-
   const handleSave = async () => {
     setFormError(null);
 
@@ -222,17 +226,65 @@ export default function MySpazaScreen() {
       setFormError('Add a contact number customers can reach you on.');
       return;
     }
+    if (!session?.accessToken) {
+      setFormError("You're not signed in — please log in again.");
+      return;
+    }
 
     setIsSaving(true);
     try {
-      await saveProfile();
+      let hostedImageUrl = '';
+      if (imageUri) {
+        if (isHostedUrl(imageUri)) {
+          hostedImageUrl = imageUri;
+        } else {
+          const uploaded = await uploadMedia(imageUri, session.accessToken);
+          hostedImageUrl = uploaded.url;
+          setImageUri(uploaded.url);
+        }
+      }
+
+      await upsertMyVendor(session.accessToken, {
+        businessName: businessName.trim(),
+        description: description.trim(),
+        categoryIds: selectedCategoryIds,
+        locationDescription: locationDescription.trim(),
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
+        contactPhone: contactPhone.trim(),
+        imageUrl: hostedImageUrl,
+      });
       setSaved(true);
-    } catch (e) {
-      setFormError(e instanceof ApiError ? e.message : "Couldn't save your spaza. Please try again.");
+    } catch (e: any) {
+      setFormError(e?.message ?? "Couldn't save your spaza profile — please try again.");
     } finally {
       setIsSaving(false);
     }
   };
+
+  const handleSaveHours = async () => {
+    if (!session?.accessToken) return;
+    setHoursSaving(true);
+    setHoursError(null);
+    try {
+      await putTradingHours(
+        session.accessToken,
+        tradingHours.map((h) => ({
+          day: h.day,
+          isOpen: h.isOpen,
+          openTime: h.isOpen ? toApiTime(h.openTime) : null,
+          closeTime: h.isOpen ? toApiTime(h.closeTime) : null,
+        }))
+      );
+      setHoursSaved(true);
+    } catch (e: any) {
+      setHoursError(e?.message ?? "Couldn't save your trading hours — please try again.");
+    } finally {
+      setHoursSaving(false);
+    }
+  };
+
+  const MAX_PROMO_PHOTOS = 5;
 
   const pickPromoPhoto = async () => {
     if (promoPhotos.length >= MAX_PROMO_PHOTOS) return;
@@ -263,21 +315,36 @@ export default function MySpazaScreen() {
       setPromoError('Add at least one photo to save your promo gallery.');
       return;
     }
+    if (!session?.accessToken) {
+      setPromoError("You're not signed in — please log in again.");
+      return;
+    }
+
     setPromoError(null);
-    setIsSavingPromo(true);
+    setPromoSaving(true);
     try {
-      await saveProfile();
+      const hostedUrls: string[] = [];
+      for (const uri of promoPhotos) {
+        if (isHostedUrl(uri)) {
+          hostedUrls.push(uri);
+        } else {
+          const uploaded = await uploadMedia(uri, session.accessToken);
+          hostedUrls.push(uploaded.url);
+        }
+      }
+      await putPromoPhotos(session.accessToken, hostedUrls);
+      setPromoPhotos(hostedUrls);
       setPromoSaved(true);
-    } catch (e) {
-      setPromoError(e instanceof ApiError ? e.message : "Couldn't save your photos. Please try again.");
+    } catch (e: any) {
+      setPromoError(e?.message ?? "Couldn't save your promo photos — please try again.");
     } finally {
-      setIsSavingPromo(false);
+      setPromoSaving(false);
     }
   };
 
-  if (isLoadingProfile) {
+  if (profileLoading) {
     return (
-      <ScreenContainer className="items-center justify-center">
+      <ScreenContainer className="items-center justify-center pt-6">
         <AppStatusBar />
         <ActivityIndicator color={colors.primary} />
       </ScreenContainer>
@@ -293,32 +360,47 @@ export default function MySpazaScreen() {
       <ScreenContainer scroll className="pt-6">
         <AppStatusBar />
 
-        <View className="items-center">
-          <View className="h-14 w-14 items-center justify-center rounded-full bg-verified/10">
-            <Feather name="check" size={24} color={colors.verified} />
-          </View>
-          <Text className="mt-4 text-xl font-semibold text-foreground">
-            {hasProfile ? 'Your spaza profile' : 'Your spaza profile is ready'}
-          </Text>
-          <Text className="mt-1.5 text-center text-sm leading-5 text-muted-foreground">
-            {hasProfile ? 'Customers can find you on Ngila.' : "You're now listed on Ngila."}
-          </Text>
+        <View className="flex-row items-center gap-1.5 self-center rounded-full bg-verified/10 px-3 py-1">
+          <Feather name="check-circle" size={12} color={colors.verified} />
+          <Text className="text-xs font-semibold text-verified">Spaza profile live</Text>
         </View>
 
-        <Text className="mb-2 mt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Spaza Summary
-        </Text>
-        <View className="gap-3 rounded-2xl border border-border bg-card p-4">
+        <View className="mt-4 gap-3 rounded-2xl border border-border bg-card p-4">
           <View className="flex-row gap-3">
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} className="h-16 w-16 rounded-xl" resizeMode="cover" />
-            ) : (
-              <View className="h-16 w-16 items-center justify-center rounded-xl bg-muted">
-                <Feather name="shopping-bag" size={20} color={colors.mutedForeground} />
-              </View>
-            )}
+            <View>
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} className="h-20 w-20 rounded-2xl" resizeMode="cover" />
+              ) : (
+                <View className="h-20 w-20 items-center justify-center rounded-2xl bg-muted">
+                  <Feather name="shopping-bag" size={22} color={colors.mutedForeground} />
+                </View>
+              )}
+              {isVerified && (
+                <View className="absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-verified">
+                  <Feather name="check" size={11} color="#FFFFFF" />
+                </View>
+              )}
+            </View>
             <View className="flex-1 justify-center gap-1">
-              <Text className="text-base font-semibold text-foreground">{businessName}</Text>
+              <View className="flex-row items-center gap-1.5">
+                <Text className="flex-shrink text-base font-semibold text-foreground" numberOfLines={1}>
+                  {businessName}
+                </Text>
+                {claimed && (
+                  <View className="rounded-full bg-primary/10 px-2 py-0.5">
+                    <Text className="text-[10px] font-semibold text-primary">Claimed</Text>
+                  </View>
+                )}
+              </View>
+              {reviewsCount > 0 ? (
+                <View className="flex-row items-center gap-1">
+                  <Feather name="star" size={12} color={colors.accent} />
+                  <Text className="text-xs font-medium text-foreground">{rating.toFixed(1)}</Text>
+                  <Text className="text-xs text-muted-foreground">({reviewsCount} reviews)</Text>
+                </View>
+              ) : (
+                <Text className="text-xs text-muted-foreground">No reviews yet</Text>
+              )}
               {!!description && (
                 <Text className="text-sm text-muted-foreground" numberOfLines={2}>
                   {description}
@@ -352,9 +434,12 @@ export default function MySpazaScreen() {
         </View>
 
         <View className="mb-1 mt-8 flex-row items-center justify-between">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Spaza Promo
-          </Text>
+          <View className="flex-row items-center gap-1.5">
+            <Feather name="image" size={13} color={colors.mutedForeground} />
+            <Text className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Spaza Promo
+            </Text>
+          </View>
           <Text className="text-xs text-muted-foreground">{promoPhotos.length}/5 photos</Text>
         </View>
         <Text className="mb-3 text-sm text-muted-foreground">
@@ -373,24 +458,47 @@ export default function MySpazaScreen() {
             )}
             <Pressable
               onPress={handleSavePromo}
-              disabled={isSavingPromo}
-              className="rounded-full bg-primary px-4 py-2 disabled:opacity-60"
+              disabled={promoSaving}
+              className="flex-row items-center gap-1.5 rounded-full bg-primary px-4 py-2"
             >
+              {promoSaving && <ActivityIndicator size="small" color={colors.primaryForeground} />}
               <Text className="text-xs font-semibold text-primary-foreground">
-                {isSavingPromo ? 'Saving…' : 'Save Promo Photos'}
+                {promoSaving ? 'Uploading…' : 'Save Promo Photos'}
               </Text>
             </Pressable>
           </View>
         </View>
 
-        <Text className="mb-2 mt-8 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Trading Hours
-        </Text>
+        <View className="mb-2 mt-8 flex-row items-center gap-1.5">
+          <Feather name="clock" size={13} color={colors.mutedForeground} />
+          <Text className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Trading Hours
+          </Text>
+        </View>
         <Text className="mb-3 text-sm text-muted-foreground">
-          Let customers know when you're open. Toggle a day off if you don't trade then. Changes
-          here are saved along with your promo photos above.
+          Let customers know when you're open. Toggle a day off if you don't trade then.
         </Text>
-        <TradingHoursEditor hours={tradingHours} onChange={setTradingHours} />
+        <TradingHoursEditor
+          hours={tradingHours}
+          onChange={(next) => {
+            setTradingHours(next);
+            setHoursSaved(false);
+          }}
+        />
+        {!!hoursError && <Text className="mt-2 text-sm text-destructive">{hoursError}</Text>}
+        <View className="mt-3 flex-row items-center justify-end gap-3">
+          {hoursSaved && !hoursError && (
+            <Text className="text-xs font-medium text-verified">Saved</Text>
+          )}
+          <Pressable
+            onPress={handleSaveHours}
+            disabled={hoursSaving}
+            className="flex-row items-center gap-1.5 rounded-full bg-primary px-4 py-2"
+          >
+            {hoursSaving && <ActivityIndicator size="small" color={colors.primaryForeground} />}
+            <Text className="text-xs font-semibold text-primary-foreground">Save Hours</Text>
+          </Pressable>
+        </View>
 
         <View className="mb-8 mt-8">
           <PrimaryButton label="Edit Spaza Details" onPress={() => setSaved(false)} variant="outline" />

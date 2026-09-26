@@ -1,8 +1,22 @@
-// POST /media/upload — uploads one image (jpg/jpeg/png/webp/gif, <=10MB) and returns its
-// Cloudinary URL. Call once per photo, then pass the returned URLs to upsertMyProfile.
-import { apiClient } from './client';
+// POST /media/upload — confirmed live 2026-09: multipart/form-data, field
+// name "file", returns { url, resourceType }. Backed by Cloudinary. This is
+// what unblocks real photo uploads for the vendor's main spaza photo and the
+// Promo Photos gallery, which were previously local-preview-only.
+//
+// The returned `url` is a normal public https URL (Cloudinary-hosted) — once
+// you have it, displaying it is just `<Image source={{ uri: url }} />` like
+// any other remote image. No extra "resolve" step needed.
+//
+// This deliberately does NOT use fetch()+FormData — on this RN/Expo version
+// that throws "Unsupported FormDataPart implementation" for the classic
+// {uri,name,type} file trick (confirmed live 2026-09). expo-file-system's
+// UploadTask does real multipart uploads natively instead, sidestepping that
+// whole class of fetch/FormData compatibility issue.
+import { File, UploadTask, UploadType } from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { API_URL, ApiError } from './client';
 
-interface UploadResponse {
+export interface MediaUploadResult {
   url: string;
   resourceType: string;
 }
@@ -32,10 +46,46 @@ export async function uploadImage(uri: string, accessToken: string): Promise<str
   return data.url;
 }
 
-/** Uploads only the URIs that are still local (skips ones already hosted, e.g. an existing
- * photo the vendor didn't change), preserving order. */
-export async function uploadNewImages(uris: string[], accessToken: string): Promise<string[]> {
-  return Promise.all(
-    uris.map((uri) => (uri.startsWith('http') ? uri : uploadImage(uri, accessToken)))
-  );
+/** Uploads a single local image (from expo-image-picker) and returns its
+ * hosted URL. Pass the local `file://`/`content://` uri as returned by the
+ * picker. */
+export async function uploadMedia(localUri: string, accessToken?: string): Promise<MediaUploadResult> {
+  const { uri, mimeType } = await prepareForUpload(localUri);
+
+  let status: number;
+  let body: string;
+  try {
+    const task = new UploadTask(new File(uri), `${API_URL}/media/upload`, {
+      httpMethod: 'POST',
+      uploadType: UploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType,
+      headers: {
+        Accept: 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+    const result = await task.uploadAsync();
+    status = result.status;
+    body = result.body;
+  } catch (e) {
+    const detail = e instanceof Error && e.message ? ` (${e.message})` : '';
+    throw new ApiError(`Could not reach the server to upload the photo${detail}. Check your connection and try again.`, 0);
+  }
+
+  let data: unknown = null;
+  try {
+    data = body ? JSON.parse(body) : null;
+  } catch {
+    data = body;
+  }
+
+  if (status < 200 || status >= 300) {
+    const obj = data as Record<string, unknown> | null;
+    const message =
+      (obj && (obj.detail as string)) || (obj && (obj.title as string)) || (obj && (obj.message as string)) || `Upload failed (${status})`;
+    throw new ApiError(message, status);
+  }
+
+  return data as MediaUploadResult;
 }

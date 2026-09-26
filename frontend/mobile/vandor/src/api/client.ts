@@ -1,7 +1,7 @@
 // Thin fetch wrapper for the NGiLA API. Base URL comes from the EXPO_PUBLIC_
 // env var (see .env / .env.example) so it's easy to point at a different
 // backend (local, staging) without touching code.
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://ngila-api.azurewebsites.net/api';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://ngila-api.azurewebsites.net/api';
 
 export class ApiError extends Error {
   status: number;
@@ -46,7 +46,14 @@ function extractErrorMessage(data: unknown): string | null {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, options);
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(options.headers ?? {}),
+      },
+    });
   } catch {
     throw new ApiError('Could not reach the server. Check your connection and try again.', 0);
   }
@@ -61,28 +68,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-function jsonHeaders(token?: string): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 export const apiClient = {
   post: <T>(path: string, body: unknown, token?: string) =>
-    request<T>(path, { method: 'POST', body: JSON.stringify(body), headers: jsonHeaders(token) }),
-  put: <T>(path: string, body: unknown, token?: string) =>
-    request<T>(path, { method: 'PUT', body: JSON.stringify(body), headers: jsonHeaders(token) }),
-  get: <T>(path: string, token?: string) =>
-    request<T>(path, { method: 'GET', headers: jsonHeaders(token) }),
-  // No Content-Type here deliberately - fetch sets the multipart boundary itself when the body
-  // is a FormData instance. Setting it manually strips the boundary and the server can't parse
-  // the upload at all.
-  upload: <T>(path: string, form: FormData, token?: string) =>
     request<T>(path, {
       method: 'POST',
-      body: form,
-      headers: token ? { Accept: 'application/json', Authorization: `Bearer ${token}` } : { Accept: 'application/json' },
+      body: JSON.stringify(body),
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }),
+  put: <T>(path: string, body: unknown, token?: string) =>
+    request<T>(path, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }),
+  get: <T>(path: string, token?: string) =>
+    request<T>(path, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     }),
 };

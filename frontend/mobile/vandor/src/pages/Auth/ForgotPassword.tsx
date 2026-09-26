@@ -3,8 +3,9 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } fro
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppStatusBar from '../../components/AppStatusBar';
+import AuthHeader from '../../components/AuthHeader';
 import TextField from '../../components/TextField';
 import PrimaryButton from '../../components/PrimaryButton';
 import { useThemeColors } from '../../styles/theme';
@@ -15,6 +16,7 @@ import type { AuthStackParamList } from '../../router/types';
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,26 +59,27 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['left', 'right', 'bottom']}>
       <AppStatusBar />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <ScrollView
-          className="flex-1 px-7"
-          contentContainerStyle={{ flexGrow: 1, paddingTop: 8, paddingBottom: 20 }}
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
           keyboardShouldPersistTaps="handled"
         >
-          <Pressable onPress={() => navigation.goBack()} className="mt-2 h-9 w-9 items-center justify-center">
-            <Feather name="arrow-left" size={20} color={colors.foreground} />
-          </Pressable>
-
-          <View className="mt-6">
-            <Text className="text-2xl font-semibold text-foreground">Forgot password?</Text>
-            <Text className="mt-1 text-sm text-muted-foreground">
-              Enter the email on your account and we'll send you a link to reset it.
-            </Text>
+          <View>
+            <AuthHeader title="Forgot password?" subtitle="We'll send you a link to get back in" compact />
+            <Pressable
+              onPress={() => navigation.goBack()}
+              hitSlop={8}
+              className="absolute left-5 h-9 w-9 items-center justify-center"
+              style={{ top: insets.top + 8 }}
+            >
+              <Feather name="arrow-left" size={20} color={colors.primaryForeground} />
+            </Pressable>
           </View>
 
-          <View className="mt-8 gap-3.5">
+          <View className="mt-7 gap-3.5 px-7">
             <TextField
               label="Email"
               icon="mail"
