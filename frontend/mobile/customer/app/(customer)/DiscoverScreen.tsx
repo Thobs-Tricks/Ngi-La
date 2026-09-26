@@ -3,6 +3,7 @@ import {
     Search,
     X,
     Map,
+    List,
     RefreshCw,
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
@@ -23,6 +24,7 @@ import { useLocationContext } from "../../context/LocationContext";
 import CategoryPill from "../../components/CategoryPill";
 import FilterChip from "../../components/FilterChip";
 import VendorCard from "../../components/VendorCard";
+import VendorMap from "../../components/VendorMap";
 import useVendors from "../../hooks/useVendors";
 
 type DiscoverScreenProps = {
@@ -41,12 +43,20 @@ export default function DiscoverScreen({
         useState("10 km");
     const [openNow, setOpenNow] = useState(false);
     const [highRating, setHighRating] = useState(false);
+    const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
     const {
         location,
         loading: locationLoading,
         retryLocation,
     } = useLocationContext();
+
+    const userLocation = location
+        ? {
+              latitude: location.coordinates.latitude,
+              longitude: location.coordinates.longitude,
+          }
+        : null;
 
     const {
         vendors,
@@ -328,35 +338,64 @@ export default function DiscoverScreen({
                 </Text>
 
                 <Pressable
+                    onPress={() =>
+                        setViewMode((mode) => (mode === "list" ? "map" : "list"))
+                    }
                     style={({ pressed }) => [
                         styles.mapButton,
                         {
-                            borderColor: theme.colors.border,
-                            backgroundColor: theme.colors.card,
+                            borderColor:
+                                viewMode === "map"
+                                    ? theme.colors.primary
+                                    : theme.colors.border,
+                            backgroundColor:
+                                viewMode === "map"
+                                    ? theme.colors.primary
+                                    : theme.colors.card,
                             opacity: pressed ? 0.7 : 1,
                         },
                     ]}
                 >
-                    <Map
-                        size={15}
-                        strokeWidth={2}
-                        color={theme.colors.foreground}
-                    />
+                    {viewMode === "map" ? (
+                        <List
+                            size={15}
+                            strokeWidth={2}
+                            color={theme.colors.primaryForeground}
+                        />
+                    ) : (
+                        <Map
+                            size={15}
+                            strokeWidth={2}
+                            color={theme.colors.foreground}
+                        />
+                    )}
 
                     <Text
                         style={[
                             styles.mapButtonText,
                             {
-                                color: theme.colors.foreground,
+                                color:
+                                    viewMode === "map"
+                                        ? theme.colors.primaryForeground
+                                        : theme.colors.foreground,
                             },
                         ]}
                     >
-                        Toggle Map
+                        {viewMode === "map" ? "Show List" : "Toggle Map"}
                     </Text>
                 </Pressable>
             </View>
 
-            {vendorsLoading ? (
+            {viewMode === "map" && !vendorsLoading && !vendorsError ? (
+                <View style={styles.mapView}>
+                    <VendorMap
+                        theme={theme}
+                        vendors={filteredVendors}
+                        userLocation={userLocation}
+                        onVendorPress={onVendorPress}
+                    />
+                </View>
+            ) : vendorsLoading ? (
                 <View
                     style={[
                         styles.emptyState,
@@ -629,6 +668,13 @@ const styles = StyleSheet.create({
     mapButtonText: {
         fontSize: 11,
         fontWeight: "500",
+    },
+
+    mapView: {
+        height: 480,
+        borderRadius: 14,
+        overflow: "hidden",
+        marginBottom: 12,
     },
 
     emptyState: {

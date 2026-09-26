@@ -11,6 +11,7 @@ import BottomNavigation, {
     CustomerTab,
 } from "../../components/BottomNavigation";
 import VendorDetailSheet from "../../components/VendorDetailSheet";
+import DirectionsSheet from "../../components/DirectionsSheet";
 import Toast from "../../components/Toast";
 import LocationPermissionModal from "../../components/LocationPermissionModal";
 import LocationServicesModal from "../../components/LocationServicesModal";
@@ -32,6 +33,9 @@ export default function CustomerHome() {
     const [selectedVendorId, setSelectedVendorId] =
         useState<string | null>(null);
 
+    const [directionsVendorId, setDirectionsVendorId] =
+        useState<string | null>(null);
+
     const [toastVisible, setToastVisible] =
         useState(false);
 
@@ -44,6 +48,7 @@ export default function CustomerHome() {
     const theme = themes[themeMode];
 
     const {
+        location,
         permissionStatus,
         servicesEnabled,
         retryLocation,
@@ -53,9 +58,21 @@ export default function CustomerHome() {
         vendors,
     } = useVendors();
 
+    const userLocation = location
+        ? {
+              latitude: location.coordinates.latitude,
+              longitude: location.coordinates.longitude,
+          }
+        : null;
+
     const selectedVendor =
         vendors.find(
             (vendor) => vendor.id === selectedVendorId
+        ) ?? null;
+
+    const directionsVendor =
+        vendors.find(
+            (vendor) => vendor.id === directionsVendorId
         ) ?? null;
 
     useEffect(() => {
@@ -126,10 +143,19 @@ export default function CustomerHome() {
             return;
         }
 
-        showToast(
-            "Directions",
-            `Directions to ${selectedVendor.name} will open here.`
-        );
+        setSelectedVendorId(null);
+        setDirectionsVendorId(selectedVendor.id);
+
+        if (!userLocation) {
+            showToast(
+                "Still locating you",
+                "Distance and route will appear once your location is ready."
+            );
+        }
+    };
+
+    const handleCloseDirections = () => {
+        setDirectionsVendorId(null);
     };
 
     const handleRateVendor = () => {
@@ -246,6 +272,14 @@ export default function CustomerHome() {
                 onClose={handleCloseVendorSheet}
                 onDirections={handleDirections}
                 onRate={handleRateVendor}
+            />
+
+            <DirectionsSheet
+                vendor={directionsVendor}
+                userLocation={userLocation}
+                visible={directionsVendor !== null}
+                theme={theme}
+                onClose={handleCloseDirections}
             />
 
             <Toast
