@@ -35,6 +35,15 @@ public class EmailSettingsService : IEmailSettingsService
     public async Task<ServiceResult<EmailSettingsResponse>> UpdateAsync(Guid adminUserId, EmailSettingsRequest request, CancellationToken ct = default)
     {
         var settings = await _context.EmailSettings.FirstOrDefaultAsync(s => s.Id == 1, ct);
+
+        // Google displays a freshly generated app password grouped as "abcd efgh ijkl mnop" for
+        // readability, and copying it usually brings those spaces along - the real credential
+        // has none, so strip all whitespace before anything else touches it.
+        var appPassword = request.AppPassword is null ? null : new string(request.AppPassword.Where(c => !char.IsWhiteSpace(c)).ToArray());
+
+        if (settings is null && string.IsNullOrEmpty(appPassword))
+            return ServiceResult<EmailSettingsResponse>.Failure("An app password is required to set up outgoing email.", 400);
+
         if (settings is null)
         {
             settings = new EmailSettings { Id = 1 };
@@ -42,7 +51,10 @@ public class EmailSettingsService : IEmailSettingsService
         }
 
         settings.SenderEmail = request.SenderEmail.Trim();
-        settings.EncryptedAppPassword = SecretProtector.Encrypt(request.AppPassword, _encryptionKeySeed);
+        // Blank means "keep the existing one" - only overwrite when a new password was actually
+        // provided, so correcting the sender email alone doesn't wipe out what's already stored.
+        if (!string.IsNullOrEmpty(appPassword))
+            settings.EncryptedAppPassword = SecretProtector.Encrypt(appPassword, _encryptionKeySeed);
         settings.UpdatedAt = DateTime.UtcNow;
         settings.UpdatedByUserId = adminUserId;
 

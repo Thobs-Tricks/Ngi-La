@@ -41,7 +41,6 @@ function Overview() {
   const statCards = stats
     ? [
         { label: "Total vendors", value: stats.totalVendors.toLocaleString(), note: "across the network", tone: "moss" as const },
-        { label: "Community added", value: stats.communityAdded.toLocaleString(), note: `of ${stats.totalVendors} total`, tone: "mute" as const },
         { label: "Pending verification", value: stats.pendingVerification.toLocaleString(), note: "awaiting review", tone: "ember" as const, alert: stats.pendingVerification > 0 },
         { label: "Active users", value: stats.activeUsers.toLocaleString(), note: "customers, vendors & admins", tone: "moss" as const },
       ]
@@ -62,7 +61,7 @@ function Overview() {
           </Link>
         }
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {statCards.map((s, i) => (
           <StatCard key={s.label} {...s} delay={100 + i * 50} />
         ))}

@@ -10,7 +10,7 @@ type NavItem = { to: "/" | "/verification" | "/vendors" | "/categories" | "/user
 const inspect: NavItem[] = [
   { to: "/", label: "Overview" },
   { to: "/verification", label: "Verification", badgeKey: "verification" },
-  { to: "/vendors", label: "Claims & Vendors" },
+  { to: "/vendors", label: "Vendors" },
   { to: "/categories", label: "Categories" },
 ];
 

@@ -8,6 +8,8 @@ public class EmailSettingsRequestValidator : AbstractValidator<EmailSettingsRequ
     public EmailSettingsRequestValidator()
     {
         RuleFor(x => x.SenderEmail).NotEmpty().EmailAddress().MaximumLength(256);
-        RuleFor(x => x.AppPassword).NotEmpty().MaximumLength(200);
+        // Generous headroom over the real 16-character app password - Google displays it grouped
+        // with spaces ("abcd efgh ijkl mnop"), which the service strips before storing.
+        RuleFor(x => x.AppPassword).MaximumLength(250);
     }
 }

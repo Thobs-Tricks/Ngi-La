@@ -30,7 +30,6 @@ export type CurrentUser = {
 
 export type AdminStats = {
   totalVendors: number;
-  communityAdded: number;
   pendingVerification: number;
   activeUsers: number;
 };
@@ -62,7 +61,7 @@ export type AdminUser = {
   reviewsWritten: number;
 };
 
-export type VendorAdminStatus = "Verified" | "Pending" | "CommunityAdded" | "Suspended";
+export type VendorAdminStatus = "Verified" | "Pending" | "Suspended";
 
 export type AdminVendor = {
   id: string;

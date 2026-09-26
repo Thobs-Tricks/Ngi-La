@@ -14,9 +14,9 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/vendors")({
   head: () => ({
     meta: [
-      { title: "Claims & vendors — Ngila Console" },
+      { title: "Vendors — Ngila Console" },
       { name: "description", content: "Browse, filter and manage every vendor listing on Ngila." },
-      { property: "og:title", content: "Claims & vendors — Ngila Console" },
+      { property: "og:title", content: "Vendors — Ngila Console" },
       { property: "og:description", content: "Browse, filter and manage every vendor listing on Ngila." },
     ],
   }),
@@ -25,12 +25,11 @@ export const Route = createFileRoute("/vendors")({
   component: Vendors,
 });
 
-const filters: ("All" | VendorAdminStatus)[] = ["All", "Verified", "Pending", "CommunityAdded", "Suspended"];
+const filters: ("All" | VendorAdminStatus)[] = ["All", "Verified", "Pending", "Suspended"];
 const filterLabel: Record<(typeof filters)[number], string> = {
   All: "All",
   Verified: "Verified",
   Pending: "Pending",
-  CommunityAdded: "Community added",
   Suspended: "Suspended",
 };
 
@@ -67,7 +66,7 @@ function Vendors() {
 
   return (
     <AdminShell>
-      <PageHead kicker={`${vendors?.length ?? 0} listings`} title="Claims & vendors" />
+      <PageHead kicker={`${vendors?.length ?? 0} listings`} title="Vendors" />
       <div className="flex flex-wrap items-center gap-2">
         {filters.map((x) => (
           <button

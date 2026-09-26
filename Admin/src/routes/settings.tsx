@@ -108,7 +108,7 @@ function Settings() {
                 required
                 value={appPassword}
                 onChange={(e) => setAppPassword(e.target.value)}
-                placeholder={settings?.isConfigured ? "•••••••••••••• (unchanged)" : "16-character app password"}
+                placeholder={settings?.isConfigured ? "**** **** **** **** (unchanged)" : "16-character app password"}
                 className="w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-mute focus:border-ember/60 focus:ring-2 focus:ring-ember/20"
               />
             </div>

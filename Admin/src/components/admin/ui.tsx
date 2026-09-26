@@ -48,21 +48,18 @@ export function MonoLabel({ children, className }: { children: ReactNode; classN
 const statusTone: Record<VendorAdminStatus, string> = {
   Verified: "bg-moss/15 text-moss",
   Pending: "bg-amber/15 text-amber",
-  CommunityAdded: "bg-paper text-mute ring-1 ring-line",
   Suspended: "bg-clay/15 text-clay",
 };
 
 const statusDot: Record<VendorAdminStatus, string> = {
   Verified: "bg-moss",
   Pending: "bg-amber",
-  CommunityAdded: "bg-mute",
   Suspended: "bg-clay",
 };
 
 const statusLabel: Record<VendorAdminStatus, string> = {
   Verified: "Verified",
   Pending: "Pending",
-  CommunityAdded: "Community added",
   Suspended: "Suspended",
 };
 

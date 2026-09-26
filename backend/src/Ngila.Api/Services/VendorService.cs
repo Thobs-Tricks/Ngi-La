@@ -362,7 +362,7 @@ public class VendorService : IVendorService
     {
         VendorStatus.Suspended => "Suspended",
         VendorStatus.Verified => "Verified",
-        _ => v.UserId is null ? "CommunityAdded" : "Pending",
+        _ => "Pending",
     };
 
     private static string CategoryNames(VendorProfile v) =>

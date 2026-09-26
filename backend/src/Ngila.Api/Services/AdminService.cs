@@ -26,12 +26,11 @@ public class AdminService : IAdminService
     public async Task<AdminStatsResponse> GetStatsAsync(CancellationToken ct = default)
     {
         var totalVendors = await _context.VendorProfiles.CountAsync(ct);
-        var communityAdded = await _context.VendorProfiles.CountAsync(v => v.AddedByUserId != null, ct);
         var pendingVerification = await _context.VendorProfiles
             .CountAsync(v => v.Status == VendorStatus.PendingVerification && v.UserId != null, ct);
         var activeUsers = await _context.Users.CountAsync(u => u.IsActive, ct);
 
-        return new AdminStatsResponse(totalVendors, communityAdded, pendingVerification, activeUsers);
+        return new AdminStatsResponse(totalVendors, pendingVerification, activeUsers);
     }
 
     public async Task<IReadOnlyList<AdminUserResponse>> GetUsersAsync(CancellationToken ct = default)
