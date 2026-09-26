@@ -38,9 +38,9 @@ export type AdminStats = {
 // Public (unauthenticated) platform stats - GET /api/stats. Used on the login screen, which has
 // no admin session yet to call the authenticated /api/admin/stats with.
 export type PlatformStats = {
-  vendorCount: number;
-  reviewCount: number;
-  areaCount: number;
+  vendorsMapped: number;
+  communityReviews: number;
+  areasLive: number;
 };
 
 export type ActivityItem = {

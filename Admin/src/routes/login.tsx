@@ -85,11 +85,11 @@ function LoginPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <span className="font-display text-3xl font-bold">{stats ? stats.vendorCount.toLocaleString() : "—"}</span>
+                  <span className="font-display text-3xl font-bold">{stats ? stats.vendorsMapped.toLocaleString() : "—"}</span>
                   <span className="ml-2 font-mono text-[11px] text-paper/60">vendors</span>
                 </div>
                 <div>
-                  <span className="font-display text-3xl font-bold">{stats ? stats.reviewCount.toLocaleString() : "—"}</span>
+                  <span className="font-display text-3xl font-bold">{stats ? stats.communityReviews.toLocaleString() : "—"}</span>
                   <span className="ml-2 font-mono text-[11px] text-paper/60">reviews</span>
                 </div>
               </div>
