@@ -1,37 +1,105 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ScreenContainer from '../../layout/ScreenContainer';
-import GlassCard from '../../components/GlassCard';
 import PrimaryButton from '../../components/PrimaryButton';
+import AppStatusBar from '../../components/AppStatusBar';
 import { useAuth } from '../../hooks/useAuth';
+import { useDarkModeToggle } from '../../lib/theme';
+import { useThemeColors } from '../../styles/theme';
+import type { ProfileStackParamList } from '../../router/types';
+
+function initialsOf(firstName?: string, lastName?: string): string {
+  const a = firstName?.[0] ?? '';
+  const b = lastName?.[0] ?? '';
+  return (a + b).toUpperCase() || '—';
+}
+
+function formatDate(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+}
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { session, logout } = useAuth();
+  const { isDark, toggle } = useDarkModeToggle();
+  const colors = useThemeColors();
+
   const user = session?.user;
+  const fullName = user ? `${user.firstName} ${user.lastName}`.trim() : '';
+  const memberSince = formatDate(user?.createdAt);
 
   return (
-    <ScreenContainer scroll className="pt-6 gap-4">
-      <Text className="text-2xl font-bold text-foreground">Profile</Text>
+    <ScreenContainer scroll className="pt-8">
+      <AppStatusBar />
+      <View className="flex-1 justify-between pb-6">
+        <View>
+          <View className="items-center">
+            <View className="h-20 w-20 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
+              <Text className="text-2xl font-semibold text-primary">
+                {initialsOf(user?.firstName, user?.lastName)}
+              </Text>
+            </View>
+            <Text className="mt-4 text-xl font-semibold text-foreground">{fullName || 'Vendor'}</Text>
+            <Text className="mt-0.5 text-sm text-muted-foreground">{user?.email ?? '—'}</Text>
+          </View>
 
-      <GlassCard className="bg-white/70">
-        <View className="gap-2">
-          <Row label="Full names" value={user?.fullNames || '—'} />
-          <Row label="Gender" value={user?.gender || '—'} />
-          <Row label="Phone" value={user?.phoneNumber || '—'} />
-          <Row label="Email" value={user?.email || '—'} />
+          <View className="mt-10">
+            <SectionLabel label="Account" />
+            <InfoRow label="Phone" value={user?.phoneNumber || '—'} />
+            <InfoRow label="Gender" value={user?.gender || '—'} />
+            <InfoRow label="Vendor since" value={memberSince ?? '—'} last />
+
+            <SectionLabel label="Settings" />
+            <View className="flex-row items-center justify-between border-b border-border py-3.5">
+              <View className="flex-row items-center gap-3">
+                <Feather name="moon" size={16} color={colors.mutedForeground} />
+                <Text className="text-sm text-foreground">Dark Mode</Text>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={toggle}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={colors.card}
+              />
+            </View>
+            <Pressable
+              onPress={() => navigation.navigate('ChangePassword')}
+              className="flex-row items-center justify-between py-3.5"
+            >
+              <View className="flex-row items-center gap-3">
+                <Feather name="lock" size={16} color={colors.mutedForeground} />
+                <Text className="text-sm text-foreground">Change Password</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
         </View>
-      </GlassCard>
 
-      <PrimaryButton label="Log Out" onPress={logout} variant="outline" />
+        <PrimaryButton label="Log Out" onPress={logout} variant="outline" />
+      </View>
     </ScreenContainer>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function SectionLabel({ label }: { label: string }) {
   return (
-    <View className="flex-row items-center justify-between border-b border-border py-2 last:border-0">
+    <Text className="mb-1 mt-6 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {label}
+    </Text>
+  );
+}
+
+function InfoRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+  return (
+    <View className={`flex-row items-center justify-between py-3.5 ${last ? '' : 'border-b border-border'}`}>
       <Text className="text-sm text-muted-foreground">{label}</Text>
-      <Text className="text-sm font-medium capitalize text-foreground">{value}</Text>
+      <Text className="text-sm font-medium text-foreground">{value}</Text>
     </View>
   );
 }

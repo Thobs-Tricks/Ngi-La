@@ -19,6 +19,20 @@
     },
     "web": {
       "favicon": "./assets/icon-mark-opaque.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NGiLA needs access to your photos so you can add a picture of your spaza."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "NGiLA uses your location to help pin your spaza's exact spot on the map."
+        }
+      ]
+    ]
   }
 }

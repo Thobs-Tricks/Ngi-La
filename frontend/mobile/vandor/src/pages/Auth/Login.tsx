@@ -1,80 +1,85 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AppStatusBar from '../../components/AppStatusBar';
 import Logo from '../../components/Logo';
-import GlassCard from '../../components/GlassCard';
 import TextField from '../../components/TextField';
 import PrimaryButton from '../../components/PrimaryButton';
 import { useAuth } from '../../hooks/useAuth';
-import { gradients } from '../../styles/theme';
 import type { AuthStackParamList } from '../../router/types';
 
 export default function LoginScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { login, isSubmitting, error, clearError } = useAuth();
 
-  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = async () => {
     try {
-      await login({ identifier, password });
+      await login({ email, password });
     } catch {
       // error is surfaced via context
     }
   };
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="light" />
-      <LinearGradient colors={gradients.sunset} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} className="h-64 items-center justify-center pt-10">
-        <Logo variant="mark" size={64} />
-        <Text className="mt-3 text-xl font-bold text-primary-foreground">Welcome back</Text>
-        <Text className="mt-1 text-sm text-primary-foreground/80">Log in to manage your spaza</Text>
-      </LinearGradient>
-
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 -mt-10">
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'left', 'right', 'bottom']}>
+      <AppStatusBar />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <ScrollView
-          className="flex-1 px-6"
-          contentContainerStyle={{ paddingBottom: 32 }}
+          className="flex-1 px-7"
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', paddingTop: 8, paddingBottom: 20 }}
           keyboardShouldPersistTaps="handled"
         >
-          <GlassCard className="bg-white/60">
-            <View className="gap-4">
+          <View>
+            <View className="items-center pt-12">
+              <Logo variant="mark" size={52} />
+              <Text className="mt-5 text-2xl font-semibold text-foreground">Welcome back</Text>
+              <Text className="mt-1 text-sm text-muted-foreground">Log in to manage your spaza</Text>
+            </View>
+
+            <View className="mt-10 gap-3.5">
               <TextField
-                label="Phone or Email"
+                label="Email"
+                icon="mail"
                 autoCapitalize="none"
                 keyboardType="email-address"
-                placeholder="e.g. 082 000 0000 or you@example.com"
-                value={identifier}
+                placeholder="you@example.com"
+                value={email}
                 onChangeText={(v) => {
-                  setIdentifier(v);
+                  setEmail(v);
                   clearError();
                 }}
               />
-              <TextField
-                label="Password"
-                isPassword
-                placeholder="••••••••"
-                value={password}
-                onChangeText={(v) => {
-                  setPassword(v);
-                  clearError();
-                }}
-              />
+              <View>
+                <TextField
+                  label="Password"
+                  icon="lock"
+                  isPassword
+                  placeholder="••••••••"
+                  value={password}
+                  onChangeText={(v) => {
+                    setPassword(v);
+                    clearError();
+                  }}
+                />
+                <Pressable onPress={() => navigation.navigate('ForgotPassword')} className="mt-2 self-end">
+                  <Text className="text-xs font-semibold text-primary">Forgot password?</Text>
+                </Pressable>
+              </View>
 
               {!!error && <Text className="text-sm text-destructive">{error}</Text>}
 
-              <View className="mt-2">
+              <View className="mt-1">
                 <PrimaryButton label="Log In" onPress={handleSubmit} loading={isSubmitting} />
               </View>
             </View>
-          </GlassCard>
+          </View>
 
-          <View className="mt-6 flex-row justify-center gap-1">
+          <View className="flex-row justify-center gap-1 pb-2">
             <Text className="text-sm text-muted-foreground">Don't have an account?</Text>
             <Pressable onPress={() => navigation.navigate('Register')}>
               <Text className="text-sm font-semibold text-primary">Register</Text>
@@ -82,6 +87,6 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }

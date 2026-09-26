@@ -9,7 +9,7 @@ import { gradients } from '../../styles/theme';
 // to land on Auth or the main tabs.
 export default function SplashScreen() {
   return (
-    <LinearGradient colors={gradients.sunset} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} className="flex-1">
+    <LinearGradient colors={gradients.terracotta} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} className="flex-1">
       <StatusBar style="light" />
       <View className="flex-1 items-center justify-center gap-3 px-10">
         <Logo variant="full" size={220} />
