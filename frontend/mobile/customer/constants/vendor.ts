@@ -6,6 +6,8 @@ export type Vendor = {
     category: string;
     description: string;
     location: string;
+    latitude: number;
+    longitude: number;
     distance: number;
     rating: number;
     reviewsCount: number;
@@ -25,6 +27,8 @@ export const vendors: Vendor[] = [
         description:
             "Authentic homemade meals and traditional favourites prepared fresh every day.",
         location: "Braamfontein, Johannesburg",
+        latitude: -26.1919,
+        longitude: 28.0341,
         distance: 350,
         rating: 4.8,
         reviewsCount: 126,
@@ -43,6 +47,8 @@ export const vendors: Vendor[] = [
         description:
             "Fresh fruit and vegetables sourced from local farmers and sold at affordable prices.",
         location: "Braamfontein, Johannesburg",
+        latitude: -26.1946,
+        longitude: 28.0407,
         distance: 640,
         rating: 4.6,
         reviewsCount: 74,
@@ -61,6 +67,8 @@ export const vendors: Vendor[] = [
         description:
             "Professional cuts, fades and grooming services from experienced local barbers.",
         location: "Braamfontein, Johannesburg",
+        latitude: -26.1885,
+        longitude: 28.0400,
         distance: 900,
         rating: 4.9,
         reviewsCount: 208,
@@ -79,6 +87,8 @@ export const vendors: Vendor[] = [
         description:
             "Airtime, data, phone accessories and everyday mobile essentials.",
         location: "Braamfontein, Johannesburg",
+        latitude: -26.2028,
+        longitude: 28.0341,
         distance: 1200,
         rating: 4.5,
         reviewsCount: 52,
@@ -97,6 +107,8 @@ export const vendors: Vendor[] = [
         description:
             "Affordable shoe repairs, restoration and maintenance for all types of footwear.",
         location: "Braamfontein, Johannesburg",
+        latitude: -26.2074,
+        longitude: 28.0225,
         distance: 1800,
         rating: 4.7,
         reviewsCount: 89,
@@ -115,6 +127,8 @@ export const vendors: Vendor[] = [
         description:
             "Convenient mobile car wash services brought directly to your location.",
         location: "Braamfontein, Johannesburg",
+        latitude: -26.1946,
+        longitude: 28.0175,
         distance: 2300,
         rating: 4.4,
         reviewsCount: 41,

@@ -3,8 +3,10 @@ import {
     Search,
     X,
     Map,
+    List,
 } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import * as Location from "expo-location";
 import {
     Pressable,
     ScrollView,
@@ -22,6 +24,7 @@ import { Theme } from "../../constants/theme";
 import CategoryPill from "../../components/CategoryPill";
 import FilterChip from "../../components/FilterChip";
 import VendorCard from "../../components/VendorCard";
+import VendorMap from "../../components/VendorMap";
 
 type DiscoverScreenProps = {
     theme: Theme;
@@ -39,6 +42,42 @@ export default function DiscoverScreen({
         useState("10 km");
     const [openNow, setOpenNow] = useState(false);
     const [highRating, setHighRating] = useState(false);
+    const [viewMode, setViewMode] = useState<"list" | "map">("list");
+    const [userLocation, setUserLocation] = useState<{
+        latitude: number;
+        longitude: number;
+    } | null>(null);
+
+    useEffect(() => {
+        if (viewMode !== "map" || userLocation) {
+            return;
+        }
+
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const { status } =
+                    await Location.requestForegroundPermissionsAsync();
+                if (status !== "granted") {
+                    return;
+                }
+                const position = await Location.getCurrentPositionAsync({});
+                if (!cancelled) {
+                    setUserLocation({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                    });
+                }
+            } catch {
+                // soft-fail - the map still works without a "you are here" pin
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [viewMode, userLocation]);
 
     const filteredVendors = useMemo(() => {
         const distanceInMetres =
@@ -276,35 +315,64 @@ export default function DiscoverScreen({
     </Text>
 
     <Pressable
+        onPress={() =>
+            setViewMode((mode) => (mode === "list" ? "map" : "list"))
+        }
         style={({ pressed }) => [
             styles.mapButton,
             {
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.card,
+                borderColor:
+                    viewMode === "map"
+                        ? theme.colors.primary
+                        : theme.colors.border,
+                backgroundColor:
+                    viewMode === "map"
+                        ? theme.colors.primary
+                        : theme.colors.card,
                 opacity: pressed ? 0.7 : 1,
             },
         ]}
     >
-        <Map
-            size={15}
-            strokeWidth={2}
-            color={theme.colors.foreground}
-        />
+        {viewMode === "map" ? (
+            <List
+                size={15}
+                strokeWidth={2}
+                color={theme.colors.primaryForeground}
+            />
+        ) : (
+            <Map
+                size={15}
+                strokeWidth={2}
+                color={theme.colors.foreground}
+            />
+        )}
 
         <Text
             style={[
                 styles.mapButtonText,
                 {
-                    color: theme.colors.foreground,
+                    color:
+                        viewMode === "map"
+                            ? theme.colors.primaryForeground
+                            : theme.colors.foreground,
                 },
             ]}
         >
-            Toggle Map
+            {viewMode === "map" ? "Show List" : "Toggle Map"}
         </Text>
     </Pressable>
 </View>
 
-            {filteredVendors.length > 0 ? (
+            {viewMode === "map" ? (
+                <View style={styles.mapView}>
+                    <VendorMap
+                        theme={theme}
+                        vendors={filteredVendors}
+                        userLocation={userLocation}
+                        onVendorPress={onVendorPress}
+                    />
+                </View>
+            ) : filteredVendors.length > 0 ? (
                 filteredVendors.map((vendor) => (
                     <VendorCard
                         key={vendor.id}
@@ -465,6 +533,13 @@ mapButton: {
     mapButtonText: {
         fontSize: 11,
         fontWeight: "500",
+    },
+
+    mapView: {
+        height: 480,
+        borderRadius: 14,
+        overflow: "hidden",
+        marginBottom: 12,
     },
 
     emptyState: {

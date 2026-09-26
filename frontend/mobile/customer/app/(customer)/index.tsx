@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import * as Location from "expo-location";
 import HomeScreen from "./HomeScreen";
 import DiscoverScreen from "./DiscoverScreen";
 import FeedScreen from "./FeedScreen";
@@ -10,6 +11,7 @@ import BottomNavigation, {
     CustomerTab,
 } from "../../components/BottomNavigation";
 import VendorDetailSheet from "../../components/VendorDetailSheet";
+import DirectionsSheet from "../../components/DirectionsSheet";
 import Toast from "../../components/Toast";
 import {
     defaultTheme,
@@ -28,6 +30,14 @@ export default function CustomerHome() {
     const [selectedVendorId, setSelectedVendorId] =
         useState<number | null>(null);
 
+    const [directionsVendorId, setDirectionsVendorId] =
+        useState<number | null>(null);
+
+    const [userLocation, setUserLocation] = useState<{
+        latitude: number;
+        longitude: number;
+    } | null>(null);
+
     const [toastVisible, setToastVisible] =
         useState(false);
 
@@ -42,6 +52,11 @@ export default function CustomerHome() {
     const selectedVendor =
         vendors.find(
             (vendor) => vendor.id === selectedVendorId
+        ) ?? null;
+
+    const directionsVendor =
+        vendors.find(
+            (vendor) => vendor.id === directionsVendorId
         ) ?? null;
 
     useEffect(() => {
@@ -114,15 +129,44 @@ export default function CustomerHome() {
         );
     };
 
-    const handleDirections = () => {
+    const handleDirections = async () => {
         if (!selectedVendor) {
             return;
         }
 
-        showToast(
-            "Directions",
-            `Directions to ${selectedVendor.name} will open here.`
-        );
+        const vendorId = selectedVendor.id;
+        setSelectedVendorId(null);
+        setDirectionsVendorId(vendorId);
+
+        if (userLocation) {
+            return;
+        }
+
+        try {
+            const { status } =
+                await Location.requestForegroundPermissionsAsync();
+            if (status !== "granted") {
+                showToast(
+                    "Location needed",
+                    "Enable location access to see distance and route."
+                );
+                return;
+            }
+            const position = await Location.getCurrentPositionAsync({});
+            setUserLocation({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+            });
+        } catch {
+            showToast(
+                "Couldn't get your location",
+                "You can still open this vendor in your maps app."
+            );
+        }
+    };
+
+    const handleCloseDirections = () => {
+        setDirectionsVendorId(null);
     };
 
     const handleRateVendor = () => {
@@ -218,6 +262,14 @@ export default function CustomerHome() {
                 onClose={handleCloseVendorSheet}
                 onDirections={handleDirections}
                 onRate={handleRateVendor}
+            />
+
+            <DirectionsSheet
+                vendor={directionsVendor}
+                userLocation={userLocation}
+                visible={directionsVendor !== null}
+                theme={theme}
+                onClose={handleCloseDirections}
             />
 
             <Toast
